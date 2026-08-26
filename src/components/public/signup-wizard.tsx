@@ -1,6 +1,6 @@
 "use client";
 
-import { RoleModule, ShiftType, type Role, type Shift } from "@prisma/client";
+import { RoleModule, type Role, type Shift } from "@prisma/client";
 import { format } from "date-fns";
 import { AlertCircle, CakeSlice, CircleCheck, Star } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -322,20 +322,24 @@ export function SignupWizard({ shifts, roles }: Props) {
             <div key={date} className="rounded-xl border border-strawberry-100 bg-background p-2">
               <p className="text-xs font-bold uppercase text-strawberry-300">{format(new Date(`${date}T00:00:00`), "EEE")}</p>
               <p className="text-lg font-black text-strawberry-900">{format(new Date(`${date}T00:00:00`), "d")}</p>
-              <div className="mt-1 space-y-1">
-                {items
-                  .filter(
-                    (s) =>
-                      s.shiftType === ShiftType.BOOTH_DAY ||
-                      s.shiftType === ShiftType.BOOTH_NIGHT ||
-                      s.shiftType === ShiftType.HALL_EARLY_SETUP,
-                  )
-                  .map((shift) => (
-                    <label key={shift.id} className="flex items-center gap-2 text-xs text-foreground/90">
-                      <input type="checkbox" checked={selectedShiftIds.includes(shift.id)} onChange={() => toggleShift(shift.id)} />
-                      {shift.label}
-                    </label>
-                  ))}
+              <div className="mt-1 space-y-2">
+                {(["BOOTH", "HALL"] as const).map((mod) => {
+                  const groupItems = items.filter((s) => s.module === mod);
+                  if (groupItems.length === 0) return null;
+                  return (
+                    <div key={mod}>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-strawberry-300">{mod === "BOOTH" ? "Booth" : "Hall"}</p>
+                      <div className="space-y-1">
+                        {groupItems.map((shift) => (
+                          <label key={shift.id} className="flex items-center gap-2 text-xs text-foreground/90">
+                            <input type="checkbox" checked={selectedShiftIds.includes(shift.id)} onChange={() => toggleShift(shift.id)} />
+                            {shift.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}

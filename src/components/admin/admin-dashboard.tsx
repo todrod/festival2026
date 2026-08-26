@@ -965,55 +965,78 @@ export function AdminDashboard() {
                 placeholder="Override reason (if force)"
               />
             </div>
-            <div className="mt-3 flex gap-2">
-              <button disabled={loading || !shiftId} onClick={runAutoAssign} className="rounded-md bg-leaf-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                Run Auto-Assign
-              </button>
-              <button
-                disabled={loading || !shiftId}
-                onClick={() => void runBulkAction("auto_assign_unfilled")}
-                className="rounded-md border border-leaf-500 px-3 py-2 text-sm font-semibold text-leaf-700 disabled:opacity-60"
-              >
-                Auto-Assign Unfilled
-              </button>
-              <button
-                disabled={loading || !shiftId}
-                onClick={() => void runBulkAction("clear_unlocked")}
-                className="rounded-md border border-amber-400 px-3 py-2 text-sm font-semibold text-amber-800 disabled:opacity-60"
-              >
-                Clear Unlocked
-              </button>
-              <button
-                disabled={loading || !shiftId}
-                onClick={() => void runBulkAction("lock_all")}
-                className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
-              >
-                Lock All
-              </button>
-              <button
-                disabled={loading || !shiftId}
-                onClick={() => void runBulkAction("unlock_all")}
-                className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
-              >
-                Unlock All
-              </button>
-              <button onClick={() => void load()} className="rounded-md border border-strawberry-300 px-3 py-2 text-sm">
-                Refresh
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => void seedTestWorkers()}
-                className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
-              >
-                Add Test Workers
-              </button>
-              <button
-                disabled={loading}
-                onClick={() => void clearTestWorkers()}
-                className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
-              >
-                Remove Test Workers
-              </button>
+            <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">Assign</span>
+                <div className="flex flex-wrap gap-2">
+                  <button disabled={loading || !shiftId} onClick={runAutoAssign} className="rounded-md bg-leaf-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    Run Auto-Assign
+                  </button>
+                  <button
+                    disabled={loading || !shiftId}
+                    onClick={() => void runBulkAction("auto_assign_unfilled")}
+                    className="rounded-md border border-leaf-500 px-3 py-2 text-sm font-semibold text-leaf-700 disabled:opacity-60"
+                  >
+                    Fill Unfilled
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">Locks</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    disabled={loading || !shiftId}
+                    onClick={() => void runBulkAction("clear_unlocked")}
+                    className="rounded-md border border-amber-400 px-3 py-2 text-sm font-semibold text-amber-800 disabled:opacity-60"
+                  >
+                    Clear Unlocked
+                  </button>
+                  <button
+                    disabled={loading || !shiftId}
+                    onClick={() => void runBulkAction("lock_all")}
+                    className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
+                  >
+                    Lock All
+                  </button>
+                  <button
+                    disabled={loading || !shiftId}
+                    onClick={() => void runBulkAction("unlock_all")}
+                    className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
+                  >
+                    Unlock All
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">View</span>
+                <div className="flex gap-2">
+                  <button onClick={() => void load()} className="rounded-md border border-strawberry-300 px-3 py-2 text-sm">
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1 rounded-lg border border-dashed border-strawberry-300 p-2 md:ml-auto">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">Demo data</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    disabled={loading}
+                    onClick={() => void seedTestWorkers()}
+                    className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
+                  >
+                    Add Test Workers
+                  </button>
+                  <button
+                    disabled={loading}
+                    onClick={() => void clearTestWorkers()}
+                    className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                  >
+                    Remove Test Workers
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
