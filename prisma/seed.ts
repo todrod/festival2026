@@ -4,6 +4,14 @@ import { FESTIVAL_END, FESTIVAL_NAME, FESTIVAL_START, ROLE_SEEDS, SHIFT_SEEDS, a
 const prisma = new PrismaClient();
 
 async function main() {
+  const alreadySeeded = (await prisma.event.count()) > 0;
+  if (alreadySeeded && !process.env.FORCE_RESEED) {
+    console.log(
+      "Database already seeded; skipping. Set FORCE_RESEED=1 to wipe and reseed.",
+    );
+    return;
+  }
+
   await prisma.assignment.deleteMany();
   await prisma.roleTarget.deleteMany();
   await prisma.preference.deleteMany();
