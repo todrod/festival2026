@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+:root {
+  --background: #152238;
+  --foreground: #f8fafc;
+  --card: #1b2b45;
+  --muted: #253654;
+  --strawberry-50: #22417a;
+  --strawberry-100: #355b9a;
+  --strawberry-300: #93c5fd;
+  --strawberry-500: #22c55e;
+  --strawberry-700: #38bdf8;
+  --strawberry-900: #f8fafc;
+  --leaf-200: #1f2937;
+  --leaf-500: #22c55e;
+  --leaf-700: #86efac;
+}
+
+.dark {
+  --background: #122039;
+  --foreground: #f8fafc;
+  --card: #1a2b46;
+  --muted: #243758;
+  --strawberry-50: #22406f;
+  --strawberry-100: #36578d;
+  --strawberry-300: #93c5fd;
+  --strawberry-500: #22c55e;
+  --strawberry-700: #38bdf8;
+  --strawberry-900: #f8fafc;
+  --leaf-200: #1f2937;
+  --leaf-500: #22c55e;
+  --leaf-700: #86efac;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-strawberry-50: var(--strawberry-50);
+  --color-strawberry-100: var(--strawberry-100);
+  --color-strawberry-300: var(--strawberry-300);
+  --color-strawberry-500: var(--strawberry-500);
+  --color-strawberry-700: var(--strawberry-700);
+  --color-strawberry-900: var(--strawberry-900);
+  --color-leaf-200: var(--leaf-200);
+  --color-leaf-500: var(--leaf-500);
+  --color-leaf-700: var(--leaf-700);
+
+  --font-sans: "Avenir Next", "Avenir", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: radial-gradient(circle at top right, #355b9a 0%, var(--background) 48%);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.dark body {
+  background: radial-gradient(circle at top right, #274a82 0%, var(--background) 52%);
+}
+
+.admin-theme {
+  --background: #122039;
+  --foreground: #f9fafb;
+  --card: #1a2b46;
+  --muted: #243758;
+  --strawberry-50: #22406f;
+  --strawberry-100: #36578d;
+  --strawberry-300: #93c5fd;
+  --strawberry-500: #22c55e;
+  --strawberry-700: #38bdf8;
+  --strawberry-900: #f9fafb;
+  --leaf-200: #1f2937;
+  --leaf-500: #22c55e;
+  --leaf-700: #86efac;
+  color: var(--foreground);
+}
+
+.admin-theme-shell {
+  border-color: #36578d;
+  background: linear-gradient(180deg, #15233e 0%, #1a2b46 100%);
+}
+
+.admin-theme .panel {
+  border-color: #36578d;
+  background: var(--card);
+  box-shadow: none;
+}
+
+.dark .admin-theme {
+  --background: #122039;
+  --foreground: #f9fafb;
+  --card: #1a2b46;
+  --muted: #243758;
+}
+
+.panel {
+  border-radius: 1rem;
+  border: 1px solid var(--strawberry-100);
+  background: var(--card);
+  box-shadow: 0 8px 24px rgba(20, 12, 14, 0.08);
+}
+
+.ops-surface {
+  border: 1px solid var(--strawberry-100);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, black 6%) 0%, var(--card) 100%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--strawberry-300) 35%, transparent 65%), 0 18px 36px rgba(2, 6, 23, 0.35);
+}
+
+.ops-chip {
+  border: 1px solid var(--strawberry-100);
+  background: color-mix(in srgb, var(--muted) 80%, transparent 20%);
+  color: var(--foreground);
+}
+
+.ops-btn {
+  border-radius: 0.65rem;
+  border: 1px solid var(--strawberry-100);
+  font-weight: 700;
+  transition: 150ms ease;
+}
+
+.ops-btn-primary {
+  background: var(--strawberry-500);
+  color: #04140b;
+}
+
+.ops-btn-primary:hover {
+  filter: brightness(1.05);
+}
+
+.ops-btn-ghost {
+  background: color-mix(in srgb, var(--muted) 78%, transparent 22%);
+  color: var(--foreground);
+}
+
+.ops-btn-ghost:hover {
+  background: var(--strawberry-50);
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  body {
+    background: white;
+    color: #111;
+  }
+}

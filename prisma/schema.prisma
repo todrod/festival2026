@@ -1,0 +1,274 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum RoleModule {
+  BOOTH
+  HALL
+}
+
+enum ShiftType {
+  BOOTH_DAY
+  BOOTH_NIGHT
+  HALL_EARLY_SETUP
+  HALL_BERRY_HULLERS
+  HALL_BERRY_PRODUCTION
+  HALL_UNIFORMS_AM
+  HALL_UNIFORMS_PM
+  HALL_HEAVY_HALL
+  HALL_BUCKET_WASHERS
+  HALL_DRIVERS
+}
+
+enum AssignmentSource {
+  AUTO
+  MANUAL
+}
+
+enum VolunteerStatus {
+  PENDING
+  VERIFIED
+}
+
+enum VerificationMethod {
+  EMAIL
+  SMS
+}
+
+model Volunteer {
+  id                   String    @id @default(cuid())
+  firstName            String
+  lastName             String
+  dob                  DateTime
+  ageConfirmed         Boolean   @default(false)
+  email                String
+  phone                String
+  emergencyContactName String
+  emergencyContactPhone String
+  gender               Gender
+  language             String    @default("English")
+  textOk               Boolean   @default(false)
+  emailOk              Boolean   @default(true)
+  yearsExperience      Int       @default(0)
+  willingAnyBoothDay   Boolean   @default(false)
+  willingAnyBoothNight Boolean   @default(false)
+  status               VolunteerStatus @default(PENDING)
+  verificationMethod   VerificationMethod @default(EMAIL)
+  verifiedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  acknowledgement VolunteerAcknowledgement?
+  availabilities  Availability[]
+  preferences     Preference[]
+  trainings       Training[]
+  approvals       Approval[]
+  assignments     Assignment[]
+  otpChallenges   OtpChallenge[]
+
+  @@index([lastName, firstName])
+  @@unique([email])
+}
+
+model OtpChallenge {
+  id               String   @id @default(cuid())
+  volunteerId      String
+  method           VerificationMethod
+  destination      String
+  codeHash         String
+  expiresAt        DateTime
+  attempts         Int      @default(0)
+  consumedAt       DateTime?
+  createdAt        DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId, createdAt])
+}
+
+model VolunteerAcknowledgement {
+  id                   String  @id @default(cuid())
+  volunteerId          String  @unique
+  age18Plus            Boolean
+  standingWalking      Boolean
+  heavyLift50          Boolean
+  cashHandling         Boolean
+  outdoorSun           Boolean
+  liabilityAcknowledged Boolean
+  foodRulesAcknowledged Boolean
+  createdAt            DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  shifts    Shift[]
+}
+
+model Shift {
+  id                String    @id @default(cuid())
+  eventId           String
+  date              DateTime
+  shiftType         ShiftType
+  module            RoleModule
+  label             String
+  startAt           DateTime
+  endAt             DateTime
+  arrivalAt         DateTime?
+  conflictStartAt   DateTime
+  conflictEndAt     DateTime
+  createdAt         DateTime  @default(now())
+
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  availabilities Availability[]
+  preferences  Preference[]
+  assignments  Assignment[]
+  roleTargets  RoleTarget[]
+
+  @@unique([date, shiftType])
+  @@index([date, module])
+}
+
+model Role {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  name              String
+  module            RoleModule
+  description       String
+  requiresStanding  Boolean  @default(false)
+  requiresHeavyLift Boolean  @default(false)
+  requiresCash      Boolean  @default(false)
+  requiresOutdoor   Boolean  @default(false)
+  requiresTraining  Boolean  @default(false)
+  requiresApproval  Boolean  @default(false)
+  requiredGender    Gender?
+  manualOnly        Boolean  @default(false)
+  isRelief          Boolean  @default(false)
+
+  preferences Preference[]
+  trainings   Training[]
+  approvals   Approval[]
+  assignments Assignment[]
+  targets     RoleTarget[]
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  volunteerId String
+  shiftId     String
+  createdAt   DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  shift     Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@unique([volunteerId, shiftId])
+  @@index([shiftId])
+}
+
+model Preference {
+  id          String   @id @default(cuid())
+  volunteerId String
+  shiftId     String
+  roleId      String
+  rank        Int
+  createdAt   DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  shift     Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([volunteerId, shiftId, roleId])
+  @@index([shiftId, roleId])
+}
+
+model Training {
+  id          String   @id @default(cuid())
+  volunteerId String
+  roleId      String
+  trained     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([volunteerId, roleId])
+}
+
+model Approval {
+  id          String   @id @default(cuid())
+  volunteerId String
+  roleId      String
+  approved    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([volunteerId, roleId])
+}
+
+model Assignment {
+  id             String   @id @default(cuid())
+  volunteerId    String
+  shiftId        String
+  roleId         String
+  source         AssignmentSource @default(MANUAL)
+  locked         Boolean  @default(false)
+  checkedInAt    DateTime?
+  noShow         Boolean  @default(false)
+  forceAssigned  Boolean  @default(false)
+  overrideReason String?
+  createdAt      DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  shift     Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([volunteerId, shiftId, roleId])
+  @@index([shiftId, roleId])
+  @@index([volunteerId])
+}
+
+model RoleTarget {
+  id        String   @id @default(cuid())
+  shiftId   String
+  roleId    String
+  target    Int
+  createdAt DateTime @default(now())
+
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([shiftId, roleId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actor       String
+  action      String
+  entityType  String
+  entityId    String?
+  shiftId     String?
+  details     String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([shiftId, createdAt])
+}

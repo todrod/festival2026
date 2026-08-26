@@ -1,0 +1,102 @@
+name: Deploy Festival App
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: festivalapp-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+      VPS_PM2_APP_NAME: ${{ secrets.VPS_PM2_APP_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+          missing=0
+          for var in VPS_HOST VPS_USER VPS_SSH_KEY VPS_APP_DIR; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Missing secret: $var"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          echo "Preflight target: ${VPS_USER}@${VPS_HOST}:${VPS_APP_DIR}"
+
+      - name: Configure SSH key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          PORT="${VPS_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Test SSH connectivity
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+          ssh -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            -p "$PORT" \
+            "$VPS_USER@$VPS_HOST" \
+            "echo 'SSH preflight ok on $(hostname)'"
+
+      - name: Deploy on VPS
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+          PM2_APP="${VPS_PM2_APP_NAME:-festivalapp}"
+          ssh -i ~/.ssh/id_ed25519 \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -p "$PORT" \
+            "$VPS_USER@$VPS_HOST" \
+            "set -euo pipefail; \
+            cd '$VPS_APP_DIR'; \
+            git pull --ff-only origin main; \
+            npm ci; \
+            npm run prisma:deploy; \
+            npm run prisma:seed; \
+            npm run build; \
+            if command -v pm2 >/dev/null 2>&1; then \
+              pm2 describe '$PM2_APP' >/dev/null 2>&1 && pm2 reload '$PM2_APP' --update-env || pm2 start npm --name '$PM2_APP' -- start; \
+              pm2 save; \
+            else \
+              echo 'pm2 not found; skipping process restart'; \
+            fi"
