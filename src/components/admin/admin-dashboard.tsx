@@ -770,7 +770,7 @@ export function AdminDashboard() {
                   <option value="ALL">All dates</option>
                   {allDates.map((d) => (
                     <option key={d} value={d}>
-                      {format(new Date(d), "EEE MMM d")}
+                      {format(new Date(`${d}T00:00:00`), "EEE MMM d")}
                     </option>
                   ))}
                 </select>
@@ -916,7 +916,7 @@ export function AdminDashboard() {
                 <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
                   <option value="ALL">All dates</option>
                   {allDates.map((d) => (
-                    <option key={d} value={d}>{format(new Date(d), "EEE MMM d")}</option>
+                    <option key={d} value={d}>{format(new Date(`${d}T00:00:00`), "EEE MMM d")}</option>
                   ))}
                 </select>
               </label>

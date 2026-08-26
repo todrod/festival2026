@@ -320,8 +320,8 @@ export function SignupWizard({ shifts, roles }: Props) {
         <div className="mt-3 grid gap-2 md:grid-cols-3">
           {shiftsByDate.map(([date, items]) => (
             <div key={date} className="rounded-xl border border-strawberry-100 bg-background p-2">
-              <p className="text-xs font-bold uppercase text-strawberry-300">{format(new Date(date), "EEE")}</p>
-              <p className="text-lg font-black text-strawberry-900">{format(new Date(date), "d")}</p>
+              <p className="text-xs font-bold uppercase text-strawberry-300">{format(new Date(`${date}T00:00:00`), "EEE")}</p>
+              <p className="text-lg font-black text-strawberry-900">{format(new Date(`${date}T00:00:00`), "d")}</p>
               <div className="mt-1 space-y-1">
                 {items
                   .filter(
