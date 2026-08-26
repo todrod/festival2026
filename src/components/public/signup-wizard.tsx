@@ -102,8 +102,6 @@ export function SignupWizard({ shifts, roles }: Props) {
   const hallRoles = roles.filter((r) => r.module === RoleModule.HALL && !r.manualOnly);
   const activeRoles = prefMode === "HALL" ? hallRoles : boothRoles;
 
-  const topDates = shiftsByDate.slice(0, 5).map(([date]) => date);
-
   const activePrefs = prefMode === "BOOTH_DAY" ? boothDayPref : prefMode === "BOOTH_NIGHT" ? boothNightPref : hallPref;
   const requiredAcknowledgementsComplete =
     form.acknowledgements.age18Plus &&
@@ -151,11 +149,6 @@ export function SignupWizard({ shifts, roles }: Props) {
 
   function toggleShift(id: string) {
     setSelectedShiftIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
-  function toggleScheduleCell(date: string, type: ShiftType) {
-    const shift = shifts.find((s) => format(new Date(s.date), "yyyy-MM-dd") === date && s.shiftType === type);
-    if (shift) toggleShift(shift.id);
   }
 
   function applyRole(role: Role) {
@@ -236,7 +229,7 @@ export function SignupWizard({ shifts, roles }: Props) {
             </div>
           </div>
           <div>
-            <h2 className="text-3xl font-black leading-tight text-strawberry-900">Volunteer for the 2026 Strawberry Shortcake Festival!</h2>
+            <h2 className="text-3xl font-black leading-tight text-strawberry-900">Volunteer for the 2026 St. Clement Strawberry Festival!</h2>
             <p className="mt-2 text-lg text-foreground/85">Select your role below. Simple for young & old.</p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               {[
@@ -428,46 +421,9 @@ export function SignupWizard({ shifts, roles }: Props) {
         </div>
       </div>}
 
-      {activeStep === 4 && <div id="grid" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
-        <h3 className="text-xl font-black text-strawberry-900">4) Simplified Schedule Grid</h3>
-        <p className="text-sm text-foreground/85">Quick select simplified grid for dates and morning/day/night windows.</p>
-        <div className="mt-3 overflow-auto">
-          <table className="w-full min-w-[620px] border-separate border-spacing-1 text-sm">
-            <thead>
-              <tr>
-                <th className="rounded bg-background p-2 text-left">Block</th>
-                {topDates.map((date) => (
-                  <th key={date} className="rounded bg-muted p-2 text-center text-strawberry-900">{format(new Date(date), "MMM d")}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ["Morning", ShiftType.HALL_EARLY_SETUP, "bg-leaf-500 text-[#04140b]"],
-                ["Day", ShiftType.BOOTH_DAY, "bg-strawberry-700 text-[#041126]"],
-                ["Night", ShiftType.BOOTH_NIGHT, "bg-strawberry-100 text-strawberry-900"],
-              ].map(([label, type, style]) => (
-                <tr key={label}>
-                  <td className="rounded bg-background p-2 font-semibold">{label}</td>
-                  {topDates.map((date) => {
-                    const shift = shifts.find((s) => format(new Date(s.date), "yyyy-MM-dd") === date && s.shiftType === type);
-                    const selected = !!shift && selectedShiftIds.includes(shift.id);
-                    return (
-                      <td key={`${label}-${date}`}>
-                        <button
-                          onClick={() => shift && toggleScheduleCell(date, type as ShiftType)}
-                          className={`w-full rounded p-2 text-center text-xs font-semibold ${selected ? style : "border border-strawberry-100 bg-background"}`}
-                        >
-                          {shift ? "Selected" : "N/A"}
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {activeStep === 4 && <div id="acknowledgements" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
+        <h3 className="text-xl font-black text-strawberry-900">4) Acknowledgements</h3>
+        <p className="text-sm text-foreground/85">Confirm the required acknowledgements below. The optional ones expand which roles you can be assigned to.</p>
         <div className="mt-4 space-y-2 text-sm">
           <p className="rounded-md border border-strawberry-100 bg-muted p-3 text-foreground">
             <AlertCircle className="mr-2 inline h-4 w-4 text-strawberry-300" />

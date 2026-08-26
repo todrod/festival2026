@@ -4,12 +4,16 @@ import { FESTIVAL_END, FESTIVAL_NAME, FESTIVAL_START, ROLE_SEEDS, SHIFT_SEEDS, a
 const prisma = new PrismaClient();
 
 async function main() {
-  const alreadySeeded = (await prisma.event.count()) > 0;
-  if (alreadySeeded && !process.env.FORCE_RESEED) {
-    console.log(
-      "Database already seeded; skipping. Set FORCE_RESEED=1 to wipe and reseed.",
-    );
-    return;
+  const existingEvent = await prisma.event.findFirst();
+  if (existingEvent && !process.env.FORCE_RESEED) {
+    // Only skip when the seeded festival window still matches the code. If the
+    // window constants changed (e.g. the DATA-1 timezone fix), fall through and
+    // reseed so shift dates are corrected. Set FORCE_RESEED=1 to always reseed.
+    if (existingEvent.startDate.getTime() === FESTIVAL_START.getTime()) {
+      console.log("Database already seeded with the current festival window; skipping.");
+      return;
+    }
+    console.log("Festival window changed; reseeding shifts and roles.");
   }
 
   await prisma.assignment.deleteMany();

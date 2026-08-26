@@ -10,8 +10,10 @@ import {
 import { prisma } from "@/lib/prisma";
 
 export const FESTIVAL_NAME = "St. Clement Strawberry Festival";
-export const FESTIVAL_START = new Date("2026-02-26T00:00:00");
-export const FESTIVAL_END = new Date("2026-03-08T00:00:00");
+// Anchored to UTC noon so the calendar date is stable regardless of the
+// viewer's (or the build server's) timezone. See audit finding DATA-1.
+export const FESTIVAL_START = new Date("2026-02-26T12:00:00Z");
+export const FESTIVAL_END = new Date("2026-03-08T12:00:00Z");
 
 export type ShiftSeed = {
   shiftType: ShiftType;
