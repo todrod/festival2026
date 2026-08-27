@@ -355,10 +355,15 @@ export async function autoAssignShift(shiftId: string) {
 
   const availableVolunteerIds = availableVolunteers.map((v) => v.id);
 
-  // Reliability: count prior no-shows so chronic no-shows are gently
-  // deprioritized in the score (seniority still wins across tiers).
+  // Reliability: count prior UNEXCUSED no-shows so chronic no-shows are gently
+  // deprioritized (seniority still wins across tiers). Excused/sick absences do
+  // not count.
   const noShowAssignments = await prisma.assignment.findMany({
-    where: { volunteerId: { in: availableVolunteerIds }, noShow: true },
+    where: {
+      volunteerId: { in: availableVolunteerIds },
+      noShow: true,
+      OR: [{ absenceReason: null }, { absenceReason: "NO_SHOW" }],
+    },
     select: { volunteerId: true },
   });
   const noShowCountByVolunteer = new Map<string, number>();

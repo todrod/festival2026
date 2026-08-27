@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDataResponse } from "@/types/app";
 import { seniorityTier } from "@/lib/seniority";
+import { isUnexcusedAbsence } from "@/lib/absence";
 
 type Tab = "coverage" | "schedule" | "training" | "volunteers";
 type ModuleFilter = "ALL" | "BOOTH" | "HALL";
@@ -125,10 +126,10 @@ function PoolCard({
   );
 }
 
-type ReliabilityStats = { assigned: number; attended: number; noShows: number };
+type ReliabilityStats = { assigned: number; attended: number; noShows: number; excused: number };
 
 function reliabilityInfo(stats?: ReliabilityStats) {
-  const s = stats ?? { assigned: 0, attended: 0, noShows: 0 };
+  const s = stats ?? { assigned: 0, attended: 0, noShows: 0, excused: 0 };
   if (s.assigned === 0) {
     return { ...s, label: "New", emoji: "🆕", className: "bg-slate-200 text-slate-800" };
   }
@@ -492,10 +493,13 @@ export function AdminDashboard() {
     const m = new Map<string, ReliabilityStats>();
     if (data) {
       for (const a of data.assignments) {
-        const r = m.get(a.volunteerId) ?? { assigned: 0, attended: 0, noShows: 0 };
+        const r = m.get(a.volunteerId) ?? { assigned: 0, attended: 0, noShows: 0, excused: 0 };
         r.assigned += 1;
         if (a.checkedInAt) r.attended += 1;
-        if (a.noShow) r.noShows += 1;
+        if (a.noShow) {
+          if (isUnexcusedAbsence(a.noShow, a.absenceReason)) r.noShows += 1;
+          else r.excused += 1;
+        }
         m.set(a.volunteerId, r);
       }
     }
@@ -1323,7 +1327,7 @@ export function AdminDashboard() {
                                 <span aria-hidden>{info.emoji}</span> {info.label}
                               </span>
                               {info.assigned > 0
-                                ? ` · ${info.attended} checked in / ${info.noShows} no-show of ${info.assigned}`
+                                ? ` · ${info.attended} in / ${info.noShows} no-show${info.excused > 0 ? ` / ${info.excused} excused` : ""} of ${info.assigned}`
                                 : " · no shifts yet"}
                             </p>
                           );
@@ -1518,6 +1522,7 @@ export function AdminDashboard() {
                               {info.assigned > 0 && (
                                 <span className="text-[10px] text-foreground/60">
                                   {info.attended} in · {info.noShows} no-show{info.noShows === 1 ? "" : "s"}
+                                  {info.excused > 0 ? ` · ${info.excused} excused` : ""}
                                 </span>
                               )}
                             </div>

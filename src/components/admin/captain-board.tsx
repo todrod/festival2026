@@ -3,6 +3,7 @@
 import { format } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import type { AdminDataResponse } from "@/types/app";
+import { ABSENCE_OPTIONS, absenceLabel, type AbsenceReasonKey } from "@/lib/absence";
 
 export function CaptainBoard() {
   const [data, setData] = useState<AdminDataResponse | null>(null);
@@ -40,12 +41,17 @@ export function CaptainBoard() {
     }, {});
   }, [assignments]);
 
-  async function updateCheckin(assignmentId: string, action: "check_in" | "undo_check_in" | "mark_no_show" | "clear_no_show") {
+  async function updateCheckin(
+    assignmentId: string,
+    action: "check_in" | "undo_check_in" | "mark_absent" | "clear_absence",
+    reason?: AbsenceReasonKey,
+    note?: string,
+  ) {
     setLoading(true);
     const res = await fetch("/api/admin/checkin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assignmentId, action }),
+      body: JSON.stringify({ assignmentId, action, reason, note }),
     });
     const payload = await res.json().catch(() => ({}));
     setMessage(res.ok ? "Updated" : payload.error || "Update failed");
@@ -80,7 +86,12 @@ export function CaptainBoard() {
                 </p>
                 <p className="text-xs opacity-80">{a.volunteer.phone}</p>
                 <p className="mt-1 text-xs">
-                  Status: {a.noShow ? "No-show" : a.checkedInAt ? `Checked in at ${format(new Date(a.checkedInAt), "HH:mm")}` : "Pending"}
+                  Status:{" "}
+                  {a.noShow
+                    ? `Absent — ${absenceLabel(a.absenceReason)}${a.absenceNote ? ` (${a.absenceNote})` : ""}`
+                    : a.checkedInAt
+                      ? `Checked in at ${format(new Date(a.checkedInAt), "HH:mm")}`
+                      : "Pending"}
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button
@@ -97,20 +108,50 @@ export function CaptainBoard() {
                   >
                     Undo
                   </button>
-                  <button
-                    disabled={loading}
-                    onClick={() => void updateCheckin(a.id, "mark_no_show")}
-                    className="rounded-md bg-amber-500 px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
-                  >
-                    Mark No-Show
-                  </button>
-                  <button
-                    disabled={loading}
-                    onClick={() => void updateCheckin(a.id, "clear_no_show")}
-                    className="rounded-md border border-strawberry-300 px-2 py-1 text-xs disabled:opacity-60"
-                  >
-                    Clear No-Show
-                  </button>
+                </div>
+                <div className="mt-2">
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/70">Mark absent</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {ABSENCE_OPTIONS.map((opt) => {
+                      const active = a.noShow && a.absenceReason === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          disabled={loading}
+                          onClick={() => void updateCheckin(a.id, "mark_absent", opt.key)}
+                          className={`rounded-md px-2 py-1 text-xs font-semibold disabled:opacity-60 ${
+                            active
+                              ? opt.excused
+                                ? "bg-emerald-500 text-white"
+                                : "bg-amber-500 text-white"
+                              : "border border-strawberry-300"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                    <button
+                      disabled={loading || !a.noShow}
+                      onClick={() => void updateCheckin(a.id, "clear_absence")}
+                      className="rounded-md border border-strawberry-300 px-2 py-1 text-xs disabled:opacity-40"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {a.noShow && (
+                    <input
+                      defaultValue={a.absenceNote ?? ""}
+                      onBlur={(e) => {
+                        const note = e.target.value;
+                        if (note.trim() !== (a.absenceNote ?? "").trim()) {
+                          void updateCheckin(a.id, "mark_absent", (a.absenceReason as AbsenceReasonKey) ?? "NO_SHOW", note);
+                        }
+                      }}
+                      placeholder="Add a note (optional)…"
+                      className="mt-2 w-full rounded-md border border-strawberry-300 bg-background px-2 py-1 text-xs"
+                    />
+                  )}
                 </div>
               </div>
             ))}

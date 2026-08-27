@@ -38,6 +38,13 @@ enum AssignmentSource {
   MANUAL
 }
 
+enum AbsenceReason {
+  NO_SHOW
+  SICK
+  EXCUSED
+  OTHER
+}
+
 enum VolunteerStatus {
   PENDING
   VERIFIED
@@ -217,6 +224,8 @@ model Assignment {
   locked         Boolean  @default(false)
   checkedInAt    DateTime?
   noShow         Boolean  @default(false)
+  absenceReason  AbsenceReason?
+  absenceNote    String?  @db.Text
   forceAssigned  Boolean  @default(false)
   overrideReason String?
   createdAt      DateTime @default(now())
