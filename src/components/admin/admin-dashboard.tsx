@@ -1430,40 +1430,66 @@ export function AdminDashboard() {
         </section>
       )}
 
-      {tab === "training" && data && (
-        <section className="panel overflow-auto p-3">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-strawberry-100 text-left">
-                <th className="p-2">Volunteer</th>
-                <th className="p-2">Supervisor Trained</th>
-                <th className="p-2">Supervisor Approved</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.volunteers.map((v) => {
-                const supervisorRole = data.roles.find((r) => r.key === "SUPERVISOR");
-                if (!supervisorRole) return null;
-                const trained = data.trainings.find((t) => t.volunteerId === v.id && t.roleId === supervisorRole.id)?.trained || false;
-                const approved = data.approvals.find((a) => a.volunteerId === v.id && a.roleId === supervisorRole.id)?.approved || false;
-                return (
-                  <tr key={v.id} className="border-b border-strawberry-50">
-                    <td className="p-2">
-                      {v.firstName} {v.lastName}
-                    </td>
-                    <td className="p-2">
-                      <input type="checkbox" checked={trained} onChange={(e) => void toggleTraining(v.id, supervisorRole.id, e.target.checked)} />
-                    </td>
-                    <td className="p-2">
-                      <input type="checkbox" checked={approved} onChange={(e) => void toggleApproval(v.id, supervisorRole.id, e.target.checked)} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      )}
+      {tab === "training" && data && (() => {
+        const gatedRoles = data.roles.filter((r) => r.requiresTraining || r.requiresApproval);
+        return (
+          <section className="panel p-3">
+            <div className="mb-3">
+              <h2 className="text-lg font-bold">Training &amp; Approvals</h2>
+              <p className="text-xs text-foreground/70">
+                {gatedRoles.length === 0
+                  ? "No roles currently require training or approval."
+                  : `Roles needing sign-off: ${gatedRoles.map((r) => r.name).join(", ")}`}
+              </p>
+            </div>
+            {gatedRoles.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm">
+                  <thead>
+                    <tr className="border-b border-strawberry-100 text-left text-xs uppercase tracking-wide text-foreground/60">
+                      <th className="p-2">Volunteer</th>
+                      {gatedRoles.map((r) => (
+                        <th key={r.id} className="p-2 text-center">{r.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.volunteers.map((v) => (
+                      <tr key={v.id} className="border-b border-strawberry-50">
+                        <td className="p-2 font-semibold">
+                          {v.firstName} {v.lastName}
+                        </td>
+                        {gatedRoles.map((r) => {
+                          const trained = data.trainings.find((t) => t.volunteerId === v.id && t.roleId === r.id)?.trained || false;
+                          const approved = data.approvals.find((a) => a.volunteerId === v.id && a.roleId === r.id)?.approved || false;
+                          return (
+                            <td key={r.id} className="p-2">
+                              <div className="flex items-center justify-center gap-3 text-xs">
+                                {r.requiresTraining && (
+                                  <label className="inline-flex items-center gap-1">
+                                    <input type="checkbox" checked={trained} onChange={(e) => void toggleTraining(v.id, r.id, e.target.checked)} />
+                                    <span className="text-foreground/70">Trained</span>
+                                  </label>
+                                )}
+                                {r.requiresApproval && (
+                                  <label className="inline-flex items-center gap-1">
+                                    <input type="checkbox" checked={approved} onChange={(e) => void toggleApproval(v.id, r.id, e.target.checked)} />
+                                    <span className="text-foreground/70">Approved</span>
+                                  </label>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {message && <p className="rounded-md bg-strawberry-50/80 px-3 py-2 text-sm text-foreground dark:bg-strawberry-100/25">{message}</p>}
     </div>

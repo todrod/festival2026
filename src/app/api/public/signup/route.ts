@@ -16,7 +16,7 @@ function isAtLeast18(dob: Date) {
 function looksFakeName(value: string) {
   const v = value.trim().toLowerCase();
   if (!v) return true;
-  const blocked = ["test", "asdf", "qwerty", "unknown", "na", "none", "fake", "sample"];
+  const blocked = ["test", "asdf", "qwerty", "unknown", "none", "fake", "sample"];
   return blocked.includes(v) || /^(.)\1{3,}$/.test(v);
 }
 
@@ -75,7 +75,6 @@ export async function POST(req: Request) {
 
       await tx.availability.deleteMany({ where: { volunteerId: existing.id } });
       await tx.preference.deleteMany({ where: { volunteerId: existing.id } });
-      await tx.otpChallenge.deleteMany({ where: { volunteerId: existing.id, consumedAt: null } });
 
       if (existing.acknowledgement) {
         await tx.volunteerAcknowledgement.update({

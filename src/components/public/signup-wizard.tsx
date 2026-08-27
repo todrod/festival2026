@@ -2,7 +2,7 @@
 
 import { RoleModule, type Role, type Shift } from "@prisma/client";
 import { format } from "date-fns";
-import { AlertCircle, CakeSlice, CircleCheck, Star } from "lucide-react";
+import { AlertCircle, CakeSlice, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 
 type Props = {
@@ -66,7 +66,7 @@ export function SignupWizard({ shifts, roles }: Props) {
     phone: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
-    gender: "FEMALE",
+    gender: "",
     language: "English",
     textOk: false,
     emailOk: true,
@@ -115,7 +115,8 @@ export function SignupWizard({ shifts, roles }: Props) {
     form.phone.trim().length >= 7 &&
     form.email.includes("@") &&
     form.emergencyContactName.trim().length > 0 &&
-    form.emergencyContactPhone.trim().length >= 7;
+    form.emergencyContactPhone.trim().length >= 7 &&
+    form.gender !== "";
   const step2Valid = selectedShiftIds.length > 0;
   const step3Valid =
     boothDayPref.length > 0 || boothNightPref.length > 0 || hallPref.length > 0 || form.willingAnyBoothDay || form.willingAnyBoothNight;
@@ -288,6 +289,7 @@ export function SignupWizard({ shifts, roles }: Props) {
               onChange={(e) => setForm((p) => ({ ...p, gender: e.target.value }))}
               className="w-full rounded-xl border border-strawberry-100 bg-background px-3 py-2 text-foreground"
             >
+              <option value="" disabled>Select…</option>
               <option value="FEMALE">Female</option>
               <option value="MALE">Male</option>
               <option value="NON_BINARY">Non-binary</option>
@@ -500,9 +502,6 @@ export function SignupWizard({ shifts, roles }: Props) {
           >
             Clear Selections
           </button>
-          <span className="inline-flex items-center gap-2 rounded-full bg-leaf-500 px-3 py-1 text-xs font-semibold text-white">
-            <CircleCheck className="h-4 w-4" /> Menus and action buttons active
-          </span>
         </div>
       </div>}
 

@@ -36,16 +36,6 @@ export const signupSchema = z.object({
   ),
 });
 
-export const verifySignupSchema = z.object({
-  volunteerId: z.string().min(1),
-  code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
-});
-
-export const resendVerificationSchema = z.object({
-  volunteerId: z.string().min(1),
-  method: z.enum(["EMAIL", "SMS"]),
-});
-
 export const loginSchema = z.object({
   password: z.string().min(1),
 });
