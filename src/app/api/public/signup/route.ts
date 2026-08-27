@@ -4,6 +4,7 @@ import { parseISO } from "date-fns";
 import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validators";
+import { buildVolunteerConfirmation, sendEmail } from "@/lib/email";
 
 function isAtLeast18(dob: Date) {
   const now = new Date();
@@ -108,6 +109,26 @@ export async function POST(req: Request) {
         data: parsed.preferences.map((p) => ({ volunteerId: created.id, shiftId: p.shiftId, roleId: p.roleId, rank: p.rank })),
         skipDuplicates: true,
       });
+    }
+
+    // Best-effort confirmation email — never fail the signup if email breaks.
+    try {
+      const shifts = parsed.availabilityShiftIds.length
+        ? await prisma.shift.findMany({
+            where: { id: { in: parsed.availabilityShiftIds } },
+            orderBy: [{ date: "asc" }, { shiftType: "asc" }],
+            select: { date: true, label: true },
+          })
+        : [];
+      const { subject, html, text } = buildVolunteerConfirmation({
+        firstName: parsed.firstName,
+        yearsExperience: parsed.yearsExperience,
+        shifts,
+        confirmationId: created.id,
+      });
+      await sendEmail({ to: parsed.email, subject, html, text });
+    } catch (emailErr) {
+      console.error("confirmation email failed", emailErr);
     }
 
     return NextResponse.json({ ok: true, volunteerId: created.id, updatedExisting: !!existing });
