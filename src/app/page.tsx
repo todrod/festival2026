@@ -1,70 +1,8 @@
-import Link from "next/link";
-import { FESTIVAL_START, FESTIVAL_END } from "@/lib/festival";
 import { format } from "date-fns";
-
-const faqs = [
-  ["Who can volunteer?", "Volunteers must be 18+ and complete acknowledgements before scheduling."],
-  ["Can I work more than one role?", "Yes. You can take multiple roles as long as time windows do not overlap."],
-  ["Can I do booth day and booth night on same date?", "No. Booth day and night cannot both be assigned for the same date."],
-  ["Are heavy roles optional?", "Yes. Heavy-lift acknowledgement is only required for flagged heavy roles and Relief."],
-  ["Do some roles require approval?", "Supervisor requires both training and explicit admin approval."],
-];
+import { FESTIVAL_START, FESTIVAL_END } from "@/lib/festival";
+import { LandingContent } from "@/components/public/landing-content";
 
 export default function HomePage() {
-  return (
-    <div className="space-y-8">
-      <section className="panel ops-surface overflow-hidden">
-        <div className="grid gap-8 bg-gradient-to-br from-strawberry-50 via-card to-leaf-200/40 p-8 md:grid-cols-2">
-          <div>
-            <p className="ops-chip mb-2 inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide text-strawberry-900">
-              Volunteer Signup Open
-            </p>
-            <h1 className="text-4xl font-black tracking-tight text-strawberry-900">
-              Volunteer for St. Clement Strawberry Festival
-            </h1>
-            <p className="mt-3 max-w-xl text-base leading-relaxed text-foreground/85">
-              Digital volunteer scheduling for booth and hall operations. Choose your days, rank role preferences, and get assigned with fair rules and seniority tie-breaks.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link
-                href="/signup"
-                className="ops-btn ops-btn-primary px-5 py-3 text-sm shadow-sm"
-              >
-                Start Volunteer Signup
-              </Link>
-              <Link href="/admin" className="ops-btn ops-btn-ghost px-5 py-3 text-sm">
-                Admin Dashboard
-              </Link>
-            </div>
-          </div>
-          <div className="ops-surface rounded-2xl p-5">
-            <h2 className="text-lg font-bold">Festival Snapshot</h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              <li>
-                <span className="font-semibold">Dates:</span> {format(FESTIVAL_START, "MMM d, yyyy")} - {format(FESTIVAL_END, "MMM d, yyyy")}
-              </li>
-              <li>
-                <span className="font-semibold">Modules:</span> BOOTH + HALL with shared volunteer pool
-              </li>
-              <li>
-                <span className="font-semibold">Shift policy:</span> no overlapping windows
-              </li>
-              <li>
-                <span className="font-semibold">Safety:</span> 18+ only, role capability checks enforced
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2">
-        {faqs.map(([q, a]) => (
-          <details key={q} className="panel ops-surface p-4">
-            <summary className="cursor-pointer text-base font-semibold">{q}</summary>
-            <p className="mt-2 text-sm text-foreground/80">{a}</p>
-          </details>
-        ))}
-      </section>
-    </div>
-  );
+  const datesLabel = `${format(FESTIVAL_START, "MMM d, yyyy")} - ${format(FESTIVAL_END, "MMM d, yyyy")}`;
+  return <LandingContent datesLabel={datesLabel} />;
 }
