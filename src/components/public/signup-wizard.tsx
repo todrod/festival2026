@@ -211,7 +211,7 @@ export function SignupWizard({ shifts, roles }: Props) {
       <section className="panel rounded-3xl border border-strawberry-100 bg-card p-6">
         <h2 className="text-2xl font-black text-strawberry-900">You&apos;re signed up!</h2>
         <p className="mt-2 text-sm">Confirmation ID: {result}</p>
-        <button onClick={() => window.print()} className="mt-4 rounded-full bg-strawberry-500 px-6 py-2 text-sm font-semibold text-white">
+        <button onClick={() => window.print()} className="mt-4 rounded-full bg-strawberry-500 px-6 py-2 text-sm font-semibold text-[#04140b]">
           Print Confirmation
         </button>
       </section>
@@ -246,7 +246,7 @@ export function SignupWizard({ shifts, roles }: Props) {
                   type="button"
                   onClick={() => setActiveStep(step as 1 | 2 | 3 | 4 | 5)}
                   className={`rounded-full px-3 py-1.5 font-semibold ${
-                    activeStep === step ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"
+                    activeStep === step ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"
                   }`}
                 >
                   {label}
@@ -325,7 +325,7 @@ export function SignupWizard({ shifts, roles }: Props) {
           <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.emailOk} onChange={(e) => setForm((p) => ({ ...p, emailOk: e.target.checked }))} /> Email OK</label>
         </div>
         <div className="mt-4 flex justify-end">
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">Next</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">Next</button>
         </div>
       </div>}
 
@@ -367,16 +367,16 @@ export function SignupWizard({ shifts, roles }: Props) {
         </div>
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">Back</button>
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">Next</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">Next</button>
         </div>
       </div>}
 
       {activeStep === 3 && <div id="jobs" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
         <h3 className="text-xl font-black text-strawberry-900">3) Job Selection</h3>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button onClick={() => setPrefMode("BOOTH_DAY")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_DAY" ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-foreground"}`}>Booth Day</button>
-          <button onClick={() => setPrefMode("BOOTH_NIGHT")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_NIGHT" ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-foreground"}`}>Booth Night</button>
-          <button onClick={() => setPrefMode("HALL")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "HALL" ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-foreground"}`}>Hall</button>
+          <button onClick={() => setPrefMode("BOOTH_DAY")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_DAY" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>Booth Day</button>
+          <button onClick={() => setPrefMode("BOOTH_NIGHT")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_NIGHT" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>Booth Night</button>
+          <button onClick={() => setPrefMode("HALL")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "HALL" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>Hall</button>
         </div>
 
         <div className="mt-3 grid gap-2 md:grid-cols-4">
@@ -386,7 +386,7 @@ export function SignupWizard({ shifts, roles }: Props) {
               <article key={role.id} className={`rounded-xl border p-2 ${selected ? "border-leaf-500 bg-leaf-200/40" : "border-strawberry-100 bg-background"}`}>
                 <p className="text-sm font-semibold text-strawberry-900">{role.name}</p>
                 <p className="mt-1 line-clamp-3 text-[11px] text-foreground/80">{role.description}</p>
-                <button onClick={() => applyRole(role)} className="mt-2 w-full rounded-lg bg-strawberry-500 px-2 py-1.5 text-xs font-semibold text-white">
+                <button onClick={() => applyRole(role)} className="mt-2 w-full rounded-lg bg-strawberry-500 px-2 py-1.5 text-xs font-semibold text-[#04140b]">
                   {selected ? "Selected" : "Apply"}
                 </button>
               </article>
@@ -436,7 +436,7 @@ export function SignupWizard({ shifts, roles }: Props) {
         </div>
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">Back</button>
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">Next</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">Next</button>
         </div>
       </div>}
 
@@ -471,7 +471,7 @@ export function SignupWizard({ shifts, roles }: Props) {
         </div>
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">Back</button>
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">Next</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">Next</button>
         </div>
       </div>}
 
@@ -499,7 +499,7 @@ export function SignupWizard({ shifts, roles }: Props) {
             type="button"
             onClick={submit}
             disabled={submitting || !requiredAcknowledgementsComplete}
-            className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white disabled:opacity-60"
+            className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b] disabled:opacity-60"
           >
             {submitting ? "Submitting..." : "Sign Up"}
           </button>

@@ -41,7 +41,7 @@ export const SENIORITY_TIERS: SeniorityTier[] = [
     max: 10,
     rank: 3,
     blurb: "6–10 years of service",
-    className: "bg-strawberry-500 text-white",
+    className: "bg-strawberry-500 text-[#04140b]",
   },
   {
     key: "LEGEND",

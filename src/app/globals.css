@@ -1,42 +1,35 @@
 @import "tailwindcss";
 
-/* Make the `dark:` utilities follow the toggled `.dark` class (the theme
-   toggle sets it) instead of only the OS preference, so light/dark are
-   fully controlled by the switch. Light is the default. */
-@custom-variant dark (&:where(.dark, .dark *));
-
-/* ---- Warm strawberry LIGHT theme (default) ---- */
 :root {
-  --background: #fff6f2;
-  --foreground: #2c1d22;
-  --card: #ffffff;
-  --muted: #fbebe6;
-  --strawberry-50: #fde7e5;
-  --strawberry-100: #f5d2ce;
-  --strawberry-300: #d95369;
-  --strawberry-500: #e23d52;
-  --strawberry-700: #b21e3b;
-  --strawberry-900: #7a1329;
-  --leaf-200: #e4f0e5;
-  --leaf-500: #3e9b57;
-  --leaf-700: #256b3b;
+  --background: #152238;
+  --foreground: #f8fafc;
+  --card: #1b2b45;
+  --muted: #253654;
+  --strawberry-50: #22417a;
+  --strawberry-100: #355b9a;
+  --strawberry-300: #93c5fd;
+  --strawberry-500: #22c55e;
+  --strawberry-700: #38bdf8;
+  --strawberry-900: #f8fafc;
+  --leaf-200: #1f2937;
+  --leaf-500: #22c55e;
+  --leaf-700: #86efac;
 }
 
-/* ---- Warm berry DARK theme ---- */
 .dark {
-  --background: #180f12;
-  --foreground: #f6e9e5;
-  --card: #241519;
-  --muted: #2e1c20;
-  --strawberry-50: #3a1e24;
-  --strawberry-100: #4a2a30;
-  --strawberry-300: #e56a7c;
-  --strawberry-500: #f0576e;
-  --strawberry-700: #f0576e;
-  --strawberry-900: #fbe3e6;
-  --leaf-200: #1f2c22;
-  --leaf-500: #58b673;
-  --leaf-700: #a7ddb4;
+  --background: #122039;
+  --foreground: #f8fafc;
+  --card: #1a2b46;
+  --muted: #243758;
+  --strawberry-50: #22406f;
+  --strawberry-100: #36578d;
+  --strawberry-300: #93c5fd;
+  --strawberry-500: #22c55e;
+  --strawberry-700: #38bdf8;
+  --strawberry-900: #f8fafc;
+  --leaf-200: #1f2937;
+  --leaf-500: #22c55e;
+  --leaf-700: #86efac;
 }
 
 @theme inline {
@@ -55,7 +48,7 @@
   --color-leaf-500: var(--leaf-500);
   --color-leaf-700: var(--leaf-700);
 
-  --font-sans: "Segoe UI", "Avenir Next", "Avenir", system-ui, sans-serif;
+  --font-sans: "Avenir Next", "Avenir", "Segoe UI", sans-serif;
 }
 
 * {
@@ -69,60 +62,67 @@ body {
 }
 
 body {
-  background: radial-gradient(circle at top right, #ffe1d8 0%, var(--background) 55%);
+  background: radial-gradient(circle at top right, #355b9a 0%, var(--background) 48%);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
 
 .dark body {
-  background: radial-gradient(circle at top right, #3a1c22 0%, var(--background) 55%);
+  background: radial-gradient(circle at top right, #274a82 0%, var(--background) 52%);
 }
 
-/* ---- Admin surface: warm, matches the theme (was forced navy) ---- */
 .admin-theme {
-  --card: #fffaf8;
-  --muted: #fbebe6;
+  --background: #122039;
+  --foreground: #f9fafb;
+  --card: #1a2b46;
+  --muted: #243758;
+  --strawberry-50: #22406f;
+  --strawberry-100: #36578d;
+  --strawberry-300: #93c5fd;
+  --strawberry-500: #22c55e;
+  --strawberry-700: #38bdf8;
+  --strawberry-900: #f9fafb;
+  --leaf-200: #1f2937;
+  --leaf-500: #22c55e;
+  --leaf-700: #86efac;
   color: var(--foreground);
 }
 
 .admin-theme-shell {
-  border-color: var(--strawberry-100);
-  background: linear-gradient(180deg, #fff6f2 0%, #fdece8 100%);
+  border-color: #36578d;
+  background: linear-gradient(180deg, #15233e 0%, #1a2b46 100%);
 }
 
 .admin-theme .panel {
-  border-color: var(--strawberry-100);
+  border-color: #36578d;
   background: var(--card);
-  box-shadow: 0 1px 2px rgba(122, 19, 41, 0.05);
+  box-shadow: none;
 }
 
 .dark .admin-theme {
-  --card: #241519;
-  --muted: #2e1c20;
-}
-
-.dark .admin-theme-shell {
-  border-color: var(--strawberry-100);
-  background: linear-gradient(180deg, #1f1216 0%, #241519 100%);
+  --background: #122039;
+  --foreground: #f9fafb;
+  --card: #1a2b46;
+  --muted: #243758;
 }
 
 .panel {
   border-radius: 1rem;
   border: 1px solid var(--strawberry-100);
   background: var(--card);
-  box-shadow: 0 8px 24px rgba(122, 19, 41, 0.06);
+  box-shadow: 0 8px 24px rgba(20, 12, 14, 0.08);
 }
 
 .ops-surface {
   border: 1px solid var(--strawberry-100);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 96%, var(--strawberry-500) 4%) 0%, var(--card) 100%);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--strawberry-300) 22%, transparent 78%), 0 18px 36px rgba(122, 19, 41, 0.12);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, black 6%) 0%, var(--card) 100%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--strawberry-300) 35%, transparent 65%), 0 18px 36px rgba(2, 6, 23, 0.35);
 }
 
 .ops-chip {
   border: 1px solid var(--strawberry-100);
-  background: color-mix(in srgb, var(--strawberry-50) 80%, transparent 20%);
-  color: var(--strawberry-900);
+  background: color-mix(in srgb, var(--muted) 80%, transparent 20%);
+  color: var(--foreground);
 }
 
 .ops-btn {
@@ -134,8 +134,7 @@ body {
 
 .ops-btn-primary {
   background: var(--strawberry-500);
-  border-color: color-mix(in srgb, var(--strawberry-500) 70%, black 30%);
-  color: #ffffff;
+  color: #04140b;
 }
 
 .ops-btn-primary:hover {
