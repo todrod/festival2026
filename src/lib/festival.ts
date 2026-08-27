@@ -8,6 +8,7 @@ import {
   type Volunteer,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { seniorityTier } from "@/lib/seniority";
 
 export const FESTIVAL_NAME = "St. Clement Strawberry Festival";
 // Anchored to UTC noon so the calendar date is stable regardless of the
@@ -424,10 +425,13 @@ export async function autoAssignShift(shiftId: string) {
         const pref = (volunteer as Prisma.VolunteerGetPayload<{
           include: { preferences: true };
         }>).preferences.find((p) => p.roleId === target.roleId);
-        const rankScore = pref ? 100 - pref.rank * 10 : 0;
-        const seniorityScore = volunteer.yearsExperience;
+        // Seniority is the primary priority: tier first, then years within the
+        // tier, then role preference as a tie-break, then a stable jitter.
+        const tier = seniorityTier(volunteer.yearsExperience);
+        const rankScore = pref ? 11 - pref.rank : 0; // 1..10 for a ranked pick, 0 otherwise
         const stable = Number.parseInt(volunteer.id.slice(-3), 36) % 7;
-        scored.push({ volunteer, score: rankScore + seniorityScore + stable / 10 });
+        const score = tier.rank * 100000 + volunteer.yearsExperience * 100 + rankScore + stable / 10;
+        scored.push({ volunteer, score });
       }
 
       scored.sort((a, b) => b.score - a.score);

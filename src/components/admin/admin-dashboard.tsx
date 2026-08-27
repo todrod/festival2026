@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDataResponse } from "@/types/app";
+import { seniorityTier } from "@/lib/seniority";
 
 type Tab = "coverage" | "schedule" | "training" | "volunteers";
 type ModuleFilter = "ALL" | "BOOTH" | "HALL";
@@ -91,7 +92,17 @@ function PoolCard({
       <div className="font-semibold">
         {volunteer.firstName} {volunteer.lastName}
       </div>
-      <div className="text-xs text-foreground/85">{volunteer.phone}</div>
+      <div className="mt-0.5 flex items-center justify-between gap-2">
+        <span className="text-xs text-foreground/85">{volunteer.phone}</span>
+        {(() => {
+          const t = seniorityTier(volunteer.yearsExperience);
+          return (
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${t.className}`} title={`${t.blurb} (${volunteer.yearsExperience} yr)`}>
+              <span aria-hidden>{t.emoji}</span> {t.label}
+            </span>
+          );
+        })()}
+      </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         <span className="rounded bg-strawberry-100 px-1.5 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/35">
           {volunteerCode}
@@ -1375,6 +1386,7 @@ export function AdminDashboard() {
                   <th className="p-2">Contact</th>
                   <th className="p-2">Gender</th>
                   <th className="p-2 text-center">Exp</th>
+                  <th className="p-2">Tier</th>
                   <th className="p-2">Can do</th>
                   <th className="p-2 text-center">Avail</th>
                   <th className="p-2 text-center">Assigned</th>
@@ -1401,6 +1413,16 @@ export function AdminDashboard() {
                       <td className="p-2 text-xs capitalize">{v.gender.replace(/_/g, " ").toLowerCase()}</td>
                       <td className="p-2 text-center tabular-nums">{v.yearsExperience}</td>
                       <td className="p-2">
+                        {(() => {
+                          const t = seniorityTier(v.yearsExperience);
+                          return (
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.className}`}>
+                              <span aria-hidden>{t.emoji}</span> {t.label}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="p-2">
                         <div className="flex flex-wrap gap-1">
                           {caps.map(([label, on]) => (
                             <span
@@ -1419,7 +1441,7 @@ export function AdminDashboard() {
                 })}
                 {roster.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-4 text-center text-foreground/60">
+                    <td colSpan={8} className="p-4 text-center text-foreground/60">
                       No volunteers match your search.
                     </td>
                   </tr>

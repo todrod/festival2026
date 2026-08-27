@@ -4,6 +4,7 @@ import { RoleModule, type Role, type Shift } from "@prisma/client";
 import { format } from "date-fns";
 import { AlertCircle, CakeSlice, Star } from "lucide-react";
 import { useMemo, useState } from "react";
+import { seniorityTier } from "@/lib/seniority";
 
 type Props = {
   shifts: Shift[];
@@ -305,6 +306,18 @@ export function SignupWizard({ shifts, roles }: Props) {
               value={form.yearsExperience}
               onChange={(e) => setForm((p) => ({ ...p, yearsExperience: Number(e.target.value || 0) }))}
             />
+            {(() => {
+              const t = seniorityTier(form.yearsExperience);
+              return (
+                <span className="mt-1 block text-xs text-foreground/70">
+                  Your status:{" "}
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.className}`}>
+                    <span aria-hidden>{t.emoji}</span> {t.label}
+                  </span>
+                  {" "}— more years means higher priority when shifts are assigned.
+                </span>
+              );
+            })()}
           </label>
         </div>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
