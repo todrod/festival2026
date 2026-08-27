@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDataResponse } from "@/types/app";
 
-type Tab = "coverage" | "schedule" | "training";
+type Tab = "coverage" | "schedule" | "training" | "volunteers";
 type ModuleFilter = "ALL" | "BOOTH" | "HALL";
 type ShiftFilter = "ALL" | string;
 
@@ -185,6 +185,7 @@ export function AdminDashboard() {
   const [coverageDateFilter, setCoverageDateFilter] = useState<string>("ALL");
   const [coverageModuleFilter, setCoverageModuleFilter] = useState<ModuleFilter>("ALL");
   const [openCoverageDate, setOpenCoverageDate] = useState<string | null>(null);
+  const [rosterSearch, setRosterSearch] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/data", { cache: "no-store" });
@@ -442,6 +443,26 @@ export function AdminDashboard() {
     if (!data) return [];
     return data.coverage.map((item) => ({ ...item, health: roleHealth(item.filled, item.targets) }));
   }, [data]);
+
+  const volunteerCounts = useMemo(() => {
+    const availByVolunteer = new Map<string, number>();
+    const assignByVolunteer = new Map<string, number>();
+    if (data) {
+      for (const a of data.availability) availByVolunteer.set(a.volunteerId, (availByVolunteer.get(a.volunteerId) ?? 0) + 1);
+      for (const a of data.assignments) assignByVolunteer.set(a.volunteerId, (assignByVolunteer.get(a.volunteerId) ?? 0) + 1);
+    }
+    return { availByVolunteer, assignByVolunteer };
+  }, [data]);
+
+  const roster = useMemo(() => {
+    if (!data) return [];
+    const q = rosterSearch.trim().toLowerCase();
+    if (!q) return data.volunteers;
+    return data.volunteers.filter((v) => {
+      const full = `${v.firstName} ${v.lastName}`.toLowerCase();
+      return full.includes(q) || v.email.toLowerCase().includes(q) || v.phone.toLowerCase().includes(q);
+    });
+  }, [data, rosterSearch]);
 
   const scheduleSummary = useMemo(() => {
     if (!selectedShift) return null;
@@ -732,6 +753,7 @@ export function AdminDashboard() {
           {([
             ["coverage", "Coverage Calendar"],
             ["schedule", "Day Detail + Board"],
+            ["volunteers", "Volunteers"],
             ["training", "Training & Approvals"],
           ] as const).map(([id, label]) => (
             <button
@@ -1326,6 +1348,85 @@ export function AdminDashboard() {
               </div>
             </DndContext>
           )}
+        </section>
+      )}
+
+      {tab === "volunteers" && data && (
+        <section className="panel p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold">Volunteer Roster</h2>
+              <p className="text-xs text-foreground/70">
+                Showing {roster.length} of {data.volunteers.length} verified volunteers
+              </p>
+            </div>
+            <input
+              className="w-full max-w-xs rounded-md border border-strawberry-200 px-3 py-2 text-sm"
+              placeholder="Search name / email / phone"
+              value={rosterSearch}
+              onChange={(e) => setRosterSearch(e.target.value)}
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-strawberry-100 text-left text-xs uppercase tracking-wide text-foreground/60">
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Contact</th>
+                  <th className="p-2">Gender</th>
+                  <th className="p-2 text-center">Exp</th>
+                  <th className="p-2">Can do</th>
+                  <th className="p-2 text-center">Avail</th>
+                  <th className="p-2 text-center">Assigned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((v) => {
+                  const ack = v.acknowledgement;
+                  const caps: Array<[string, boolean]> = [
+                    ["Stand", !!ack?.standingWalking],
+                    ["Heavy", !!ack?.heavyLift50],
+                    ["Cash", !!ack?.cashHandling],
+                    ["Outdoor", !!ack?.outdoorSun],
+                  ];
+                  return (
+                    <tr key={v.id} className="border-b border-strawberry-50 align-top">
+                      <td className="p-2 font-semibold">
+                        {v.firstName} {v.lastName}
+                      </td>
+                      <td className="p-2 text-xs text-foreground/80">
+                        <div>{v.email}</div>
+                        <div>{v.phone}</div>
+                      </td>
+                      <td className="p-2 text-xs capitalize">{v.gender.replace(/_/g, " ").toLowerCase()}</td>
+                      <td className="p-2 text-center tabular-nums">{v.yearsExperience}</td>
+                      <td className="p-2">
+                        <div className="flex flex-wrap gap-1">
+                          {caps.map(([label, on]) => (
+                            <span
+                              key={label}
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${on ? "bg-leaf-200 text-leaf-700" : "bg-muted text-foreground/40"}`}
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-2 text-center tabular-nums">{volunteerCounts.availByVolunteer.get(v.id) ?? 0}</td>
+                      <td className="p-2 text-center tabular-nums">{volunteerCounts.assignByVolunteer.get(v.id) ?? 0}</td>
+                    </tr>
+                  );
+                })}
+                {roster.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-4 text-center text-foreground/60">
+                      No volunteers match your search.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
 
