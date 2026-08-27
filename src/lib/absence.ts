@@ -1,4 +1,4 @@
-// Absence reasons for Captain Mode. "excused" reasons are recorded for context
+// Absence reasons for Supervisor Mode. "excused" reasons are recorded for context
 // but do NOT count against a volunteer's reliability or auto-assign priority —
 // only a plain, unexcused No-show does.
 export type AbsenceReasonKey = "NO_SHOW" | "SICK" | "EXCUSED" | "OTHER";

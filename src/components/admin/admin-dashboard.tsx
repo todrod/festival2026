@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDataResponse } from "@/types/app";
 import { seniorityTier } from "@/lib/seniority";
 import { isUnexcusedAbsence } from "@/lib/absence";
+import { useLang } from "@/components/i18n/language-provider";
 
 type Tab = "coverage" | "schedule" | "training" | "volunteers";
 type ModuleFilter = "ALL" | "BOOTH" | "HALL";
@@ -79,6 +80,7 @@ function PoolCard({
   fitSummary: string;
   reliability: ReturnType<typeof reliabilityInfo>;
 }) {
+  const { t } = useLang();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `pool:${volunteer.id}`,
   });
@@ -98,10 +100,10 @@ function PoolCard({
       <div className="mt-0.5 flex items-center justify-between gap-2">
         <span className="text-xs text-foreground/85">{volunteer.phone}</span>
         {(() => {
-          const t = seniorityTier(volunteer.yearsExperience);
+          const tier = seniorityTier(volunteer.yearsExperience);
           return (
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${t.className}`} title={`${t.blurb} (${volunteer.yearsExperience} yr)`}>
-              <span aria-hidden>{t.emoji}</span> {t.label}
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tier.className}`} title={`${t(tier.blurb)} (${volunteer.yearsExperience} ${t("yr")})`}>
+              <span aria-hidden>{tier.emoji}</span> {t(tier.label)}
             </span>
           );
         })()}
@@ -109,9 +111,9 @@ function PoolCard({
       <div className="mt-0.5">
         <span
           className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${reliability.className}`}
-          title={reliability.assigned > 0 ? `${reliability.attended} checked in · ${reliability.noShows} no-show` : "No shifts yet"}
+          title={reliability.assigned > 0 ? `${reliability.attended} ${t("checked in")} · ${reliability.noShows} ${t("no-show")}` : t("No shifts yet")}
         >
-          <span aria-hidden>{reliability.emoji}</span> {reliability.label}
+          <span aria-hidden>{reliability.emoji}</span> {t(reliability.label)}
         </span>
       </div>
       <div className="mt-1 flex items-center justify-between gap-2">
@@ -165,6 +167,7 @@ function RoleColumn({
   dropState: "idle" | "eligible" | "ineligible";
   children: React.ReactNode;
 }) {
+  const { t } = useLang();
   const { setNodeRef, isOver } = useDroppable({ id: `role:${role.id}`, disabled: dropState === "ineligible" });
   const health = roleHealth(count, target);
   return (
@@ -182,14 +185,14 @@ function RoleColumn({
     >
       <button type="button" className="mb-2 flex w-full items-center justify-between text-left" onClick={onSelect}>
         <h3 className="text-sm font-semibold">
-          {role.name} <span className="text-xs opacity-70">({roleCode})</span>
+          {t(role.name)} <span className="text-xs opacity-70">({roleCode})</span>
         </h3>
         <span className="rounded-full bg-strawberry-100 px-2 py-0.5 text-xs text-foreground dark:bg-strawberry-100/35">
           {count}/{target}
         </span>
       </button>
       <div className="mb-2 flex items-center justify-between">
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${health.className}`}>{health.label}</span>
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${health.className}`}>{t(health.label)}</span>
       </div>
       <div className="space-y-0.5">{children}</div>
     </div>
@@ -197,6 +200,7 @@ function RoleColumn({
 }
 
 export function AdminDashboard() {
+  const { t } = useLang();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [tab, setTab] = useState<Tab>("coverage");
   const [password, setPassword] = useState("");
@@ -239,13 +243,13 @@ export function AdminDashboard() {
     try {
       payload = (await res.json()) as AdminDataResponse;
     } catch {
-      setMessage("Failed to parse admin response. Check server/API error logs.");
+      setMessage(t("Failed to parse admin response. Check server/API error logs."));
       return;
     }
     setData(payload);
     if (!shiftId && payload.shifts[0]) setShiftId(payload.shifts[0].id);
     setAuthed(true);
-  }, [shiftId]);
+  }, [shiftId, t]);
 
   useEffect(() => {
     void load();
@@ -618,7 +622,7 @@ export function AdminDashboard() {
       await load();
       setMessage("");
     } else {
-      setMessage("Login failed");
+      setMessage(t("Login failed"));
     }
   }
 
@@ -631,14 +635,14 @@ export function AdminDashboard() {
       body: JSON.stringify({ shiftId }),
     });
     const payload = await res.json();
-    setMessage(res.ok ? "Auto-assignment complete" : payload.error || "Auto-assignment failed");
+    setMessage(res.ok ? t("Auto-assignment complete") : payload.error || t("Auto-assignment failed"));
     setLoading(false);
     await load();
   }
 
   async function assignSelectedFromInspector() {
     if (!selectedVolunteer || !selectedRole || !selectedShift) {
-      setMessage("Select a volunteer and role first.");
+      setMessage(t("Select a volunteer and role first."));
       return;
     }
     const res = await fetch("/api/admin/assignments", {
@@ -653,13 +657,13 @@ export function AdminDashboard() {
       }),
     });
     const payload = await res.json();
-    setMessage(res.ok ? payload.warning || "Assigned from inspector." : payload.error || "Assignment failed");
+    setMessage(res.ok ? payload.warning || t("Assigned from inspector.") : payload.error || t("Assignment failed"));
     await load();
   }
 
   async function loadSuggestionsForRole() {
     if (!selectedShift || !selectedRole) {
-      setMessage("Select a shift and role first.");
+      setMessage(t("Select a shift and role first."));
       return;
     }
     const res = await fetch("/api/admin/suggestions", {
@@ -669,11 +673,11 @@ export function AdminDashboard() {
     });
     const payload = await res.json().catch(() => ({ suggestions: [] }));
     if (!res.ok) {
-      setMessage(payload.error || "Failed to load suggestions");
+      setMessage(payload.error || t("Failed to load suggestions"));
       return;
     }
     setRoleSuggestions(payload.suggestions || []);
-    setMessage(`Loaded ${payload.suggestions?.length ?? 0} replacement suggestions.`);
+    setMessage(`${t("Loaded")} ${payload.suggestions?.length ?? 0} ${t("replacement suggestions.")}`);
   }
 
   async function runBulkAction(action: "clear_unlocked" | "lock_all" | "unlock_all" | "auto_assign_unfilled") {
@@ -688,15 +692,15 @@ export function AdminDashboard() {
     if (res.ok) {
       const msg =
         action === "clear_unlocked"
-          ? `Cleared ${payload.count ?? 0} unlocked assignments`
+          ? `${t("Cleared")} ${payload.count ?? 0} ${t("unlocked assignments")}`
           : action === "lock_all"
-            ? `Locked ${payload.count ?? 0} assignments`
+            ? `${t("Locked")} ${payload.count ?? 0} ${t("assignments")}`
             : action === "unlock_all"
-              ? `Unlocked ${payload.count ?? 0} assignments`
-              : `Auto-assigned unfilled roles (${payload.count ?? 0} total assignments now)`;
+              ? `${t("Unlocked")} ${payload.count ?? 0} ${t("assignments")}`
+              : `${t("Auto-assigned unfilled roles")} (${payload.count ?? 0} ${t("total assignments now")})`;
       setMessage(msg);
     } else {
-      setMessage(payload.error || "Bulk action failed");
+      setMessage(payload.error || t("Bulk action failed"));
     }
     setLoading(false);
     await load();
@@ -706,7 +710,7 @@ export function AdminDashboard() {
     setLoading(true);
     const res = await fetch("/api/admin/test-workers", { method: "POST" });
     const payload = await res.json().catch(() => ({}));
-    setMessage(res.ok ? `Created ${payload.created ?? 0} test workers.` : payload.error || "Failed to create test workers");
+    setMessage(res.ok ? `${t("Created")} ${payload.created ?? 0} ${t("test workers.")}` : payload.error || t("Failed to create test workers"));
     setLoading(false);
     await load();
   }
@@ -715,7 +719,7 @@ export function AdminDashboard() {
     setLoading(true);
     const res = await fetch("/api/admin/test-workers", { method: "DELETE" });
     const payload = await res.json().catch(() => ({}));
-    setMessage(res.ok ? `Removed ${payload.deleted ?? 0} test workers.` : payload.error || "Failed to remove test workers");
+    setMessage(res.ok ? `${t("Removed")} ${payload.deleted ?? 0} ${t("test workers.")}` : payload.error || t("Failed to remove test workers"));
     setLoading(false);
     await load();
   }
@@ -731,7 +735,7 @@ export function AdminDashboard() {
     const roleId = over.replace("role:", "");
     const eligibility = roleEligibilityMap.get(`${volunteerId}:${roleId}`);
     if (!eligibility?.eligible) {
-      setMessage(`Cannot assign: ${eligibility?.reasons.join(", ") || "Ineligible for role"}`);
+      setMessage(`${t("Cannot assign:")} ${eligibility?.reasons.map((r) => t(r)).join(", ") || t("Ineligible for role")}`);
       setSelectedVolunteerId(volunteerId);
       setInspectorRoleId(roleId);
       return;
@@ -749,7 +753,7 @@ export function AdminDashboard() {
       }),
     });
     const payload = await res.json();
-    setMessage(res.ok ? payload.warning || "Assigned" : payload.error || "Assignment failed");
+    setMessage(res.ok ? payload.warning || t("Assigned") : payload.error || t("Assignment failed"));
     setSelectedVolunteerId(volunteerId);
     setInspectorRoleId(roleId);
     await load();
@@ -761,7 +765,7 @@ export function AdminDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ volunteerId, notes }),
     });
-    setMessage(res.ok ? "Note saved." : "Failed to save note.");
+    setMessage(res.ok ? t("Note saved.") : t("Failed to save note."));
     if (res.ok) await load();
   }
 
@@ -792,16 +796,16 @@ export function AdminDashboard() {
   if (!authed) {
     return (
       <section className="panel max-w-md p-5">
-        <h2 className="text-xl font-bold">Admin Login</h2>
+        <h2 className="text-xl font-bold">{t("Admin Login")}</h2>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="mt-3 w-full rounded-lg border border-strawberry-200 px-3 py-2"
-          placeholder="Admin password"
+          placeholder={t("Admin password")}
         />
         <button onClick={login} className="mt-3 rounded-lg bg-strawberry-500 px-4 py-2 text-sm font-semibold text-white">
-          Sign In
+          {t("Sign In")}
         </button>
         {message && <p className="mt-2 text-sm text-red-700">{message}</p>}
       </section>
@@ -823,19 +827,19 @@ export function AdminDashboard() {
               onClick={() => setTab(id)}
               className={`rounded-md px-3 py-1.5 text-sm ${tab === id ? "bg-strawberry-500 text-white" : "bg-strawberry-50/80 text-foreground dark:bg-strawberry-100/25"}`}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
           <Link href="/admin/print" className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
-            Print Center
+            {t("Print Center")}
           </Link>
           <Link href="/admin/captain" className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
-            Captain Mode
+            {t("Supervisor Mode")}
           </Link>
           <button onClick={logout} className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
-            Logout
+            {t("Logout")}
           </button>
         </div>
       </div>
@@ -845,13 +849,13 @@ export function AdminDashboard() {
           <div className="panel p-3">
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-sm">
-                <span className="mb-1 block font-semibold">Coverage Date</span>
+                <span className="mb-1 block font-semibold">{t("Coverage Date")}</span>
                 <select
                   value={coverageDateFilter}
                   onChange={(e) => setCoverageDateFilter(e.target.value)}
                   className="w-full rounded-md border border-strawberry-200 px-2 py-2"
                 >
-                  <option value="ALL">All dates</option>
+                  <option value="ALL">{t("All dates")}</option>
                   {allDates.map((d) => (
                     <option key={d} value={d}>
                       {format(new Date(`${d}T00:00:00`), "EEE MMM d")}
@@ -860,15 +864,15 @@ export function AdminDashboard() {
                 </select>
               </label>
               <label className="text-sm">
-                <span className="mb-1 block font-semibold">Coverage Module</span>
+                <span className="mb-1 block font-semibold">{t("Coverage Module")}</span>
                 <select
                   value={coverageModuleFilter}
                   onChange={(e) => setCoverageModuleFilter(e.target.value as ModuleFilter)}
                   className="w-full rounded-md border border-strawberry-200 px-2 py-2"
                 >
-                  <option value="ALL">All modules</option>
-                  <option value="BOOTH">Booth only</option>
-                  <option value="HALL">Hall only</option>
+                  <option value="ALL">{t("All modules")}</option>
+                  <option value="BOOTH">{t("Booth only")}</option>
+                  <option value="HALL">{t("Hall only")}</option>
                 </select>
               </label>
             </div>
@@ -891,7 +895,7 @@ export function AdminDashboard() {
             ).sort(([a], [b]) => (a < b ? -1 : 1));
 
             if (grouped.length === 0) {
-              return <p className="panel p-3 text-sm text-foreground/90">No coverage rows match the current filters.</p>;
+              return <p className="panel p-3 text-sm text-foreground/90">{t("No coverage rows match the current filters.")}</p>;
             }
 
             return grouped.map(([date, items]) => {
@@ -905,10 +909,10 @@ export function AdminDashboard() {
                   className="flex flex-1 items-center justify-between rounded-md border border-strawberry-100 bg-card px-3 py-2 text-left"
                 >
                   <span className="text-sm font-semibold">{format(new Date(`${date}T00:00:00`), "EEEE, MMM d")}</span>
-                  <span className="text-xs font-semibold text-foreground">{isOpen ? "Hide" : "Show"}</span>
+                  <span className="text-xs font-semibold text-foreground">{isOpen ? t("Hide") : t("Show")}</span>
                 </button>
                 <span className="rounded-full bg-strawberry-100/80 px-2 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/25">
-                  {items.length} shifts
+                  {items.length} {t("shifts")}
                 </span>
               </div>
               {isOpen && (
@@ -918,7 +922,7 @@ export function AdminDashboard() {
                   { title: "Hall", list: items.filter((i) => i.shiftType.startsWith("HALL_")) },
                 ].map((group) => (
                   <div key={group.title} className="rounded-lg border border-strawberry-100/80 p-2">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">{group.title}</p>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">{t(group.title)}</p>
                     <div className="space-y-2">
                       {group.list
                         .sort((a, b) => shiftSortWeight(a.shiftType) - shiftSortWeight(b.shiftType))
@@ -931,28 +935,28 @@ export function AdminDashboard() {
                             }}
                             className={`w-full rounded-lg border p-3 text-left ${shiftToneClasses(item.shiftType)}`}
                           >
-                            <p className="text-xs font-semibold uppercase tracking-wide text-white">Shift</p>
-                            <p className="text-sm font-semibold tracking-wide text-white">{formatShiftTypeLabel(item.shiftType)}</p>
-                            <p className="mt-1 text-xs text-slate-100">{shiftDescription(item.shiftType)}</p>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-white">{t("Shift")}</p>
+                            <p className="text-sm font-semibold tracking-wide text-white">{t(formatShiftTypeLabel(item.shiftType))}</p>
+                            <p className="mt-1 text-xs text-slate-100">{t(shiftDescription(item.shiftType))}</p>
                             <div className="mt-2 grid grid-cols-3 gap-2">
                               <div className="rounded-md bg-slate-700/95 px-2 py-1">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Filled</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">{t("Filled")}</p>
                                 <p className="text-base font-black text-white">{item.filled}</p>
                               </div>
                               <div className="rounded-md bg-slate-700/95 px-2 py-1">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Target</p>
-                                <p className="text-base font-black text-white">{item.targets > 0 ? item.targets : "Not set"}</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">{t("Target")}</p>
+                                <p className="text-base font-black text-white">{item.targets > 0 ? item.targets : t("Not set")}</p>
                               </div>
                               <div className="rounded-md bg-slate-700/95 px-2 py-1">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">Status</p>
-                                <span className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.health.className}`}>{item.health.label}</span>
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">{t("Status")}</p>
+                                <span className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.health.className}`}>{t(item.health.label)}</span>
                               </div>
                             </div>
-                            <p className="mt-2 text-[11px] text-slate-100">Click card to open this shift in Day Detail.</p>
+                            <p className="mt-2 text-[11px] text-slate-100">{t("Click card to open this shift in Day Detail.")}</p>
                           </button>
                         ))}
                       {group.list.length === 0 && (
-                        <p className="rounded-md border border-strawberry-100 bg-card px-2 py-2 text-xs text-foreground/90">No {group.title.toLowerCase()} shifts for this date.</p>
+                        <p className="rounded-md border border-strawberry-100 bg-card px-2 py-2 text-xs text-foreground/90">{t("No shifts of this type for this date.")}</p>
                       )}
                     </div>
                   </div>
@@ -971,23 +975,23 @@ export function AdminDashboard() {
           {scheduleSummary && (
             <div className="panel grid gap-2 p-3 text-sm md:grid-cols-5">
               <div className="rounded-md bg-strawberry-50/80 px-3 py-2 text-foreground dark:bg-strawberry-100/25">
-                <p className="text-xs uppercase text-foreground/90">Target Slots</p>
+                <p className="text-xs uppercase text-foreground/90">{t("Target Slots")}</p>
                 <p className="text-lg font-black text-strawberry-700">{scheduleSummary.totalTarget}</p>
               </div>
               <div className="rounded-md bg-leaf-200/35 px-3 py-2 text-foreground dark:bg-leaf-200/25">
-                <p className="text-xs uppercase text-foreground/90">Assigned</p>
+                <p className="text-xs uppercase text-foreground/90">{t("Assigned")}</p>
                 <p className="text-lg font-black text-leaf-700">{scheduleSummary.assignedCount}</p>
               </div>
               <div className="rounded-md bg-amber-100 px-3 py-2 text-foreground dark:bg-amber-700/40 dark:text-amber-100">
-                <p className="text-xs uppercase text-foreground/90">Unfilled</p>
+                <p className="text-xs uppercase text-foreground/90">{t("Unfilled")}</p>
                 <p className="text-lg font-black text-amber-700">{scheduleSummary.unfilled}</p>
               </div>
               <div className="rounded-md bg-card px-3 py-2 text-foreground">
-                <p className="text-xs uppercase text-foreground/90">Available Pool</p>
+                <p className="text-xs uppercase text-foreground/90">{t("Available Pool")}</p>
                 <p className="text-lg font-black">{scheduleSummary.availableCount}</p>
               </div>
               <div className="rounded-md bg-slate-100 px-3 py-2 text-foreground dark:bg-slate-700/40">
-                <p className="text-xs uppercase text-foreground/90">Locked</p>
+                <p className="text-xs uppercase text-foreground/90">{t("Locked")}</p>
                 <p className="text-lg font-black text-foreground">{scheduleSummary.lockedCount}</p>
               </div>
             </div>
@@ -996,37 +1000,37 @@ export function AdminDashboard() {
           <div className="no-print sticky top-14 z-10 panel border-2 border-strawberry-100 p-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <label className="text-sm">
-                <span className="mb-1 block font-semibold">Date</span>
+                <span className="mb-1 block font-semibold">{t("Date")}</span>
                 <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
-                  <option value="ALL">All dates</option>
+                  <option value="ALL">{t("All dates")}</option>
                   {allDates.map((d) => (
                     <option key={d} value={d}>{format(new Date(`${d}T00:00:00`), "EEE MMM d")}</option>
                   ))}
                 </select>
               </label>
               <label className="text-sm">
-                <span className="mb-1 block font-semibold">Module</span>
+                <span className="mb-1 block font-semibold">{t("Module")}</span>
                 <select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value as ModuleFilter)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
-                  <option value="ALL">All</option>
-                  <option value="BOOTH">Booth</option>
-                  <option value="HALL">Hall</option>
+                  <option value="ALL">{t("All")}</option>
+                  <option value="BOOTH">{t("Booth")}</option>
+                  <option value="HALL">{t("Hall")}</option>
                 </select>
               </label>
               <label className="text-sm">
-                <span className="mb-1 block font-semibold">Shift Type</span>
+                <span className="mb-1 block font-semibold">{t("Shift Type")}</span>
                 <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
-                  <option value="ALL">All</option>
+                  <option value="ALL">{t("All")}</option>
                   {[...new Set(data.shifts.map((s) => s.shiftType))].map((st) => (
-                    <option key={st} value={st}>{formatShiftTypeLabel(st)}</option>
+                    <option key={st} value={st}>{t(formatShiftTypeLabel(st))}</option>
                   ))}
                 </select>
               </label>
               <label className="text-sm xl:col-span-2">
-                <span className="mb-1 block font-semibold">Shift</span>
+                <span className="mb-1 block font-semibold">{t("Shift")}</span>
                 <select value={shiftId} onChange={(e) => setShiftId(e.target.value)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
                   {filteredShifts.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {format(new Date(s.date), "EEE MMM d")} - {s.label}
+                      {format(new Date(s.date), "EEE MMM d")} - {t(s.label)}
                     </option>
                   ))}
                 </select>
@@ -1035,89 +1039,89 @@ export function AdminDashboard() {
             <div className="mt-3 grid gap-3 md:grid-cols-4">
               <input
                 className="rounded-md border border-strawberry-200 px-2 py-2 text-sm md:col-span-2"
-                placeholder="Search volunteer name/email/phone"
+                placeholder={t("Search volunteer name/email/phone")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               <label className="inline-flex items-center gap-2 rounded-md border border-strawberry-200 px-2 py-2 text-xs">
-                <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> Force assign
+                <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} /> {t("Force assign")}
               </label>
               <input
                 className="rounded-md border border-strawberry-200 px-2 py-2 text-sm"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder="Override reason (if force)"
+                placeholder={t("Override reason (if force)")}
               />
             </div>
             <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">Assign</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Assign")}</span>
                 <div className="flex flex-wrap gap-2">
                   <button disabled={loading || !shiftId} onClick={runAutoAssign} className="rounded-md bg-leaf-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                    Run Auto-Assign
+                    {t("Run Auto-Assign")}
                   </button>
                   <button
                     disabled={loading || !shiftId}
                     onClick={() => void runBulkAction("auto_assign_unfilled")}
                     className="rounded-md border border-leaf-500 px-3 py-2 text-sm font-semibold text-leaf-700 disabled:opacity-60"
                   >
-                    Fill Unfilled
+                    {t("Fill Unfilled")}
                   </button>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">Locks</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Locks")}</span>
                 <div className="flex flex-wrap gap-2">
                   <button
                     disabled={loading || !shiftId}
                     onClick={() => void runBulkAction("clear_unlocked")}
                     className="rounded-md border border-amber-400 px-3 py-2 text-sm font-semibold text-amber-800 disabled:opacity-60"
                   >
-                    Clear Unlocked
+                    {t("Clear Unlocked")}
                   </button>
                   <button
                     disabled={loading || !shiftId}
                     onClick={() => void runBulkAction("lock_all")}
                     className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
                   >
-                    Lock All
+                    {t("Lock All")}
                   </button>
                   <button
                     disabled={loading || !shiftId}
                     onClick={() => void runBulkAction("unlock_all")}
                     className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
                   >
-                    Unlock All
+                    {t("Unlock All")}
                   </button>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">View</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("View")}</span>
                 <div className="flex gap-2">
                   <button onClick={() => void load()} className="rounded-md border border-strawberry-300 px-3 py-2 text-sm">
-                    Refresh
+                    {t("Refresh")}
                   </button>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1 rounded-lg border border-dashed border-strawberry-300 p-2 md:ml-auto">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">Demo data</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Demo data")}</span>
                 <div className="flex flex-wrap gap-2">
                   <button
                     disabled={loading}
                     onClick={() => void seedTestWorkers()}
                     className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
                   >
-                    Add Test Workers
+                    {t("Add Test Workers")}
                   </button>
                   <button
                     disabled={loading}
                     onClick={() => void clearTestWorkers()}
                     className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
                   >
-                    Remove Test Workers
+                    {t("Remove Test Workers")}
                   </button>
                 </div>
               </div>
@@ -1138,10 +1142,10 @@ export function AdminDashboard() {
               <div className="grid gap-4 xl:grid-cols-[280px_1fr_300px]">
                 <div className="panel xl:col-span-3 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground/85">Role Legend</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground/85">{t("Role Legend")}</p>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="rounded border border-strawberry-200 bg-card px-2 py-0.5">
-                        Filter: {selectedRoleFilterIds.length === 0 ? "All roles" : `${selectedRoleFilterIds.length} selected`}
+                        {t("Filter:")} {selectedRoleFilterIds.length === 0 ? t("All roles") : `${selectedRoleFilterIds.length} ${t("selected")}`}
                       </span>
                       {selectedRoleFilterIds.length > 0 && (
                         <button
@@ -1149,7 +1153,7 @@ export function AdminDashboard() {
                           onClick={() => setSelectedRoleFilterIds([])}
                           className="rounded border border-strawberry-300 px-2 py-0.5"
                         >
-                          Clear
+                          {t("Clear")}
                         </button>
                       )}
                     </div>
@@ -1174,21 +1178,21 @@ export function AdminDashboard() {
                         <span className="rounded-full bg-strawberry-100 px-1.5 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/35">
                           {roleCodeMap.get(role.id) || "R?"}
                         </span>
-                        <span>{role.name}</span>
+                        <span>{t(role.name)}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <aside className="panel no-print p-3">
-                  <h3 className="font-semibold">Available Pool</h3>
+                  <h3 className="font-semibold">{t("Available Pool")}</h3>
                   <p className="mb-2 text-xs text-foreground/85">
-                    Drag into a green role, red roles are blocked.
-                    {selectedRoleFilterIds.length > 0 ? " Pool is filtered by selected role chips." : ""}
+                    {t("Drag into a green role, red roles are blocked.")}
+                    {selectedRoleFilterIds.length > 0 ? ` ${t("Pool is filtered by selected role chips.")}` : ""}
                   </p>
                   <input
                     className="mb-2 w-full rounded-md border border-strawberry-200 px-2 py-2 text-xs"
-                    placeholder="Search available pool"
+                    placeholder={t("Search available pool")}
                     value={poolSearch}
                     onChange={(e) => setPoolSearch(e.target.value)}
                   />
@@ -1204,7 +1208,7 @@ export function AdminDashboard() {
                             onClick={() => toggleRoleFilter(roleId)}
                             className="rounded-full border border-leaf-500 bg-leaf-200/40 px-2 py-0.5 text-[11px]"
                           >
-                            {roleCodeMap.get(roleId) || "R?"} {role.name} ×
+                            {roleCodeMap.get(roleId) || "R?"} {t(role.name)} ×
                           </button>
                         );
                       })}
@@ -1224,17 +1228,17 @@ export function AdminDashboard() {
                     ))}
                     {availablePool.length === 0 && (
                       <p className="text-xs text-foreground/90">
-                        No available volunteers after filters.
+                        {t("No available volunteers after filters.")}
                       </p>
                     )}
                   </div>
                   <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-2 text-foreground dark:bg-amber-700/25 dark:text-amber-100">
                     <p className="text-xs font-semibold text-amber-900 dark:text-amber-100">
-                      Needs Attention{roleForAttention ? `: ${roleForAttention.name}` : ""}
+                      {t("Needs Attention")}{roleForAttention ? `: ${t(roleForAttention.name)}` : ""}
                     </p>
                     <div className="mt-2 space-y-1 text-xs">
                       {needsAttention.length === 0 ? (
-                        <p className="text-amber-900 dark:text-amber-100">No blockers detected in current pool.</p>
+                        <p className="text-amber-900 dark:text-amber-100">{t("No blockers detected in current pool.")}</p>
                       ) : (
                         needsAttention.map((item) => (
                           <button
@@ -1246,7 +1250,7 @@ export function AdminDashboard() {
                             <p className="font-semibold">
                               {item.volunteer.firstName} {item.volunteer.lastName}
                             </p>
-                            <p className="text-amber-900 dark:text-amber-100">{item.reasons.slice(0, 2).join(" • ")}</p>
+                            <p className="text-amber-900 dark:text-amber-100">{item.reasons.slice(0, 2).map((r) => t(r)).join(" • ")}</p>
                           </button>
                         ))
                       )}
@@ -1285,7 +1289,7 @@ export function AdminDashboard() {
                             <span>
                               {a.volunteer.firstName} {a.volunteer.lastName}
                             </span>
-                            {a.forceAssigned && <span className="text-xs text-orange-700 dark:text-orange-200">FORCED</span>}
+                            {a.forceAssigned && <span className="text-xs text-orange-700 dark:text-orange-200">{t("FORCED")}</span>}
                           </button>
                         ))}
                       </RoleColumn>
@@ -1294,9 +1298,9 @@ export function AdminDashboard() {
                 </div>
 
                 <aside className="panel p-3">
-                  <h3 className="font-semibold">Inspector</h3>
+                  <h3 className="font-semibold">{t("Inspector")}</h3>
                   {!selectedVolunteer ? (
-                    <p className="mt-2 text-xs text-foreground/90">Select a volunteer card to inspect eligibility and today&apos;s assignments.</p>
+                    <p className="mt-2 text-xs text-foreground/90">{t("Select a volunteer card to inspect eligibility and today's assignments.")}</p>
                   ) : (
                     <div className="mt-2 space-y-2 text-xs">
                       <p className="font-semibold">
@@ -1311,64 +1315,64 @@ export function AdminDashboard() {
                         {getVolunteerFit(selectedVolunteer.id).summary}
                       </p>
                       <div className="rounded border border-strawberry-100 bg-strawberry-50 p-2">
-                        <p className="font-semibold">Acknowledgements</p>
-                        <p>Standing: {selectedVolunteer.acknowledgement?.standingWalking ? "Yes" : "No"}</p>
-                        <p>Heavy lift: {selectedVolunteer.acknowledgement?.heavyLift50 ? "Yes" : "No"}</p>
-                        <p>Cash: {selectedVolunteer.acknowledgement?.cashHandling ? "Yes" : "No"}</p>
-                        <p>Outdoor: {selectedVolunteer.acknowledgement?.outdoorSun ? "Yes" : "No"}</p>
+                        <p className="font-semibold">{t("Acknowledgements")}</p>
+                        <p>{t("Standing:")} {selectedVolunteer.acknowledgement?.standingWalking ? t("Yes") : t("No")}</p>
+                        <p>{t("Heavy lift:")} {selectedVolunteer.acknowledgement?.heavyLift50 ? t("Yes") : t("No")}</p>
+                        <p>{t("Cash:")} {selectedVolunteer.acknowledgement?.cashHandling ? t("Yes") : t("No")}</p>
+                        <p>{t("Outdoor:")} {selectedVolunteer.acknowledgement?.outdoorSun ? t("Yes") : t("No")}</p>
                       </div>
                       <div className="rounded border border-strawberry-100 p-2">
-                        <p className="font-semibold">Reliability</p>
+                        <p className="font-semibold">{t("Reliability")}</p>
                         {(() => {
                           const info = reliabilityInfo(reliabilityByVolunteer.get(selectedVolunteer.id));
                           return (
                             <p className="mt-1">
                               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
-                                <span aria-hidden>{info.emoji}</span> {info.label}
+                                <span aria-hidden>{info.emoji}</span> {t(info.label)}
                               </span>
                               {info.assigned > 0
-                                ? ` · ${info.attended} in / ${info.noShows} no-show${info.excused > 0 ? ` / ${info.excused} excused` : ""} of ${info.assigned}`
-                                : " · no shifts yet"}
+                                ? ` · ${info.attended} ${t("in")} / ${info.noShows} ${t("no-show")}${info.excused > 0 ? ` / ${info.excused} ${t("excused")}` : ""} ${t("of")} ${info.assigned}`
+                                : ` · ${t("no shifts yet")}`}
                             </p>
                           );
                         })()}
                         {selectedVolunteer.adminNotes && (
                           <p className="mt-1">
-                            <span className="font-semibold">Note:</span> {selectedVolunteer.adminNotes}
+                            <span className="font-semibold">{t("Note:")}</span> {selectedVolunteer.adminNotes}
                           </p>
                         )}
                       </div>
                       {selectedRole && (
                         <div className="rounded border border-leaf-300 bg-leaf-200/40 p-2">
-                          <p className="font-semibold">Selected Role</p>
-                          <p>{selectedRole.name}</p>
-                          <p className="mt-1">Requires training: {selectedRole.requiresTraining ? "Yes" : "No"}</p>
-                          <p>Requires approval: {selectedRole.requiresApproval ? "Yes" : "No"}</p>
-                          <p>Required gender: {selectedRole.requiredGender || "Any"}</p>
+                          <p className="font-semibold">{t("Selected Role")}</p>
+                          <p>{t(selectedRole.name)}</p>
+                          <p className="mt-1">{t("Requires training:")} {selectedRole.requiresTraining ? t("Yes") : t("No")}</p>
+                          <p>{t("Requires approval:")} {selectedRole.requiresApproval ? t("Yes") : t("No")}</p>
+                          <p>{t("Required gender:")} {selectedRole.requiredGender ? t(selectedRole.requiredGender) : t("Any")}</p>
                         </div>
                       )}
                       {selectedRole && (
                         <div className={`rounded border p-2 ${eligibilityReasons.length === 0 ? "border-green-300 bg-green-50 text-green-900 dark:bg-green-700/30 dark:text-green-100" : "border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-700/30 dark:text-amber-100"}`}>
-                          <p className="font-semibold">Eligibility Check</p>
+                          <p className="font-semibold">{t("Eligibility Check")}</p>
                           {eligibilityReasons.length === 0 ? (
-                            <p className="text-green-700 dark:text-green-100">Eligible for selected role and shift.</p>
+                            <p className="text-green-700 dark:text-green-100">{t("Eligible for selected role and shift.")}</p>
                           ) : (
                             <ul className="list-disc pl-4 text-amber-900 dark:text-amber-100">
                               {eligibilityReasons.map((r) => (
-                                <li key={r}>{r}</li>
+                                <li key={r}>{t(r)}</li>
                               ))}
                             </ul>
                           )}
                         </div>
                       )}
                       <div className="rounded border border-strawberry-100 p-2">
-                        <p className="mb-1 font-semibold">Assignments this date</p>
+                        <p className="mb-1 font-semibold">{t("Assignments this date")}</p>
                         {selectedVolunteerAssignmentsToday.length === 0 ? (
-                          <p>None</p>
+                          <p>{t("None")}</p>
                         ) : (
                           selectedVolunteerAssignmentsToday.map((a) => (
                             <p key={a.id}>
-                              {a.shift.label} - {a.role.name}
+                              {t(a.shift.label)} - {t(a.role.name)}
                             </p>
                           ))
                         )}
@@ -1379,7 +1383,7 @@ export function AdminDashboard() {
                           onClick={() => void assignSelectedFromInspector()}
                           className="w-full rounded-md bg-strawberry-500 px-3 py-2 text-xs font-semibold text-white"
                         >
-                          Assign Selected Volunteer to {selectedRole.name}
+                          {t("Assign Selected Volunteer to")} {t(selectedRole.name)}
                         </button>
                       )}
                       {selectedRole && (
@@ -1388,12 +1392,12 @@ export function AdminDashboard() {
                           onClick={() => void loadSuggestionsForRole()}
                           className="w-full rounded-md border border-leaf-500 px-3 py-2 text-xs font-semibold text-leaf-700"
                         >
-                          Suggest Replacements for {selectedRole.name}
+                          {t("Suggest Replacements for")} {t(selectedRole.name)}
                         </button>
                       )}
                       {selectedRole && roleSuggestions.length > 0 && (
                         <div className="rounded border border-leaf-300 bg-leaf-200/30 p-2">
-                          <p className="font-semibold">Top Suggestions</p>
+                          <p className="font-semibold">{t("Top Suggestions")}</p>
                           <div className="mt-1 space-y-1">
                             {roleSuggestions.map((s) => (
                               <button
@@ -1403,7 +1407,7 @@ export function AdminDashboard() {
                                 className="w-full rounded border border-leaf-200 bg-card px-2 py-1 text-left text-xs text-foreground"
                               >
                                 <p className="font-semibold">{s.name}</p>
-                                <p className="text-xs">Score: {s.score.toFixed(1)}</p>
+                                <p className="text-xs">{t("Score:")} {s.score.toFixed(1)}</p>
                                 <p className="text-xs">{s.reasons.join(" • ")}</p>
                               </button>
                             ))}
@@ -1413,10 +1417,10 @@ export function AdminDashboard() {
                     </div>
                   )}
                   <div className="mt-4 rounded-md border border-strawberry-100 bg-strawberry-50/80 p-2 text-foreground dark:bg-strawberry-100/25">
-                    <p className="text-xs font-semibold">Recent Activity</p>
+                    <p className="text-xs font-semibold">{t("Recent Activity")}</p>
                     <div className="mt-2 max-h-44 space-y-1 overflow-auto text-xs">
                       {data.auditLogs.length === 0 ? (
-                        <p className="text-foreground/90">No audit entries yet.</p>
+                        <p className="text-foreground/90">{t("No audit entries yet.")}</p>
                       ) : (
                         data.auditLogs.slice(0, 20).map((log) => (
                           <div key={log.id} className="rounded border border-strawberry-100 bg-card px-2 py-1 text-foreground">
@@ -1439,14 +1443,14 @@ export function AdminDashboard() {
         <section className="panel p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-bold">Volunteer Roster</h2>
+              <h2 className="text-lg font-bold">{t("Volunteer Roster")}</h2>
               <p className="text-xs text-foreground/70">
-                Showing {roster.length} of {data.volunteers.length} verified volunteers
+                {t("Showing")} {roster.length} {t("of")} {data.volunteers.length} {t("verified volunteers")}
               </p>
             </div>
             <input
               className="w-full max-w-xs rounded-md border border-strawberry-200 px-3 py-2 text-sm"
-              placeholder="Search name / email / phone"
+              placeholder={t("Search name / email / phone")}
               value={rosterSearch}
               onChange={(e) => setRosterSearch(e.target.value)}
             />
@@ -1455,26 +1459,26 @@ export function AdminDashboard() {
             <table className="w-full min-w-[1040px] text-sm">
               <thead>
                 <tr className="border-b border-strawberry-100 text-left text-xs uppercase tracking-wide text-foreground/60">
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Contact</th>
-                  <th className="p-2">Gender</th>
-                  <th className="p-2 text-center">Exp</th>
-                  <th className="p-2">Tier</th>
-                  <th className="p-2">Can do</th>
-                  <th className="p-2 text-center">Avail</th>
-                  <th className="p-2 text-center">Assigned</th>
-                  <th className="p-2">Reliability</th>
-                  <th className="p-2">Notes (admin only)</th>
+                  <th className="p-2">{t("Name")}</th>
+                  <th className="p-2">{t("Contact")}</th>
+                  <th className="p-2">{t("Gender")}</th>
+                  <th className="p-2 text-center">{t("Exp")}</th>
+                  <th className="p-2">{t("Tier")}</th>
+                  <th className="p-2">{t("Can do")}</th>
+                  <th className="p-2 text-center">{t("Avail")}</th>
+                  <th className="p-2 text-center">{t("Assigned")}</th>
+                  <th className="p-2">{t("Reliability")}</th>
+                  <th className="p-2">{t("Notes (admin only)")}</th>
                 </tr>
               </thead>
               <tbody>
                 {roster.map((v) => {
                   const ack = v.acknowledgement;
                   const caps: Array<[string, boolean]> = [
-                    ["Stand", !!ack?.standingWalking],
-                    ["Heavy", !!ack?.heavyLift50],
-                    ["Cash", !!ack?.cashHandling],
-                    ["Outdoor", !!ack?.outdoorSun],
+                    [t("Stand"), !!ack?.standingWalking],
+                    [t("Heavy"), !!ack?.heavyLift50],
+                    [t("Cash"), !!ack?.cashHandling],
+                    [t("Outdoor"), !!ack?.outdoorSun],
                   ];
                   return (
                     <tr key={v.id} className="border-b border-strawberry-50 align-top">
@@ -1489,10 +1493,10 @@ export function AdminDashboard() {
                       <td className="p-2 text-center tabular-nums">{v.yearsExperience}</td>
                       <td className="p-2">
                         {(() => {
-                          const t = seniorityTier(v.yearsExperience);
+                          const tier = seniorityTier(v.yearsExperience);
                           return (
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.className}`}>
-                              <span aria-hidden>{t.emoji}</span> {t.label}
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tier.className}`}>
+                              <span aria-hidden>{tier.emoji}</span> {t(tier.label)}
                             </span>
                           );
                         })()}
@@ -1517,12 +1521,12 @@ export function AdminDashboard() {
                           return (
                             <div className="flex flex-col gap-0.5">
                               <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
-                                <span aria-hidden>{info.emoji}</span> {info.label}
+                                <span aria-hidden>{info.emoji}</span> {t(info.label)}
                               </span>
                               {info.assigned > 0 && (
                                 <span className="text-[10px] text-foreground/60">
-                                  {info.attended} in · {info.noShows} no-show{info.noShows === 1 ? "" : "s"}
-                                  {info.excused > 0 ? ` · ${info.excused} excused` : ""}
+                                  {info.attended} {t("in")} · {info.noShows} {info.noShows === 1 ? t("no-show") : t("no-shows")}
+                                  {info.excused > 0 ? ` · ${info.excused} ${t("excused")}` : ""}
                                 </span>
                               )}
                             </div>
@@ -1535,7 +1539,7 @@ export function AdminDashboard() {
                           onBlur={(e) => {
                             if (e.target.value.trim() !== (v.adminNotes ?? "").trim()) void saveNote(v.id, e.target.value);
                           }}
-                          placeholder="Add a note…"
+                          placeholder={t("Add a note…")}
                           className="w-44 rounded-md border border-strawberry-200 bg-background px-2 py-1 text-xs"
                         />
                       </td>
@@ -1545,7 +1549,7 @@ export function AdminDashboard() {
                 {roster.length === 0 && (
                   <tr>
                     <td colSpan={10} className="p-4 text-center text-foreground/60">
-                      No volunteers match your search.
+                      {t("No volunteers match your search.")}
                     </td>
                   </tr>
                 )}
@@ -1560,11 +1564,11 @@ export function AdminDashboard() {
         return (
           <section className="panel p-3">
             <div className="mb-3">
-              <h2 className="text-lg font-bold">Training &amp; Approvals</h2>
+              <h2 className="text-lg font-bold">{t("Training & Approvals")}</h2>
               <p className="text-xs text-foreground/70">
                 {gatedRoles.length === 0
-                  ? "No roles currently require training or approval."
-                  : `Roles needing sign-off: ${gatedRoles.map((r) => r.name).join(", ")}`}
+                  ? t("No roles currently require training or approval.")
+                  : `${t("Roles needing sign-off:")} ${gatedRoles.map((r) => t(r.name)).join(", ")}`}
               </p>
             </div>
             {gatedRoles.length > 0 && (
@@ -1572,9 +1576,9 @@ export function AdminDashboard() {
                 <table className="w-full min-w-[560px] text-sm">
                   <thead>
                     <tr className="border-b border-strawberry-100 text-left text-xs uppercase tracking-wide text-foreground/60">
-                      <th className="p-2">Volunteer</th>
+                      <th className="p-2">{t("Volunteer")}</th>
                       {gatedRoles.map((r) => (
-                        <th key={r.id} className="p-2 text-center">{r.name}</th>
+                        <th key={r.id} className="p-2 text-center">{t(r.name)}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1593,13 +1597,13 @@ export function AdminDashboard() {
                                 {r.requiresTraining && (
                                   <label className="inline-flex items-center gap-1">
                                     <input type="checkbox" checked={trained} onChange={(e) => void toggleTraining(v.id, r.id, e.target.checked)} />
-                                    <span className="text-foreground/70">Trained</span>
+                                    <span className="text-foreground/70">{t("Trained")}</span>
                                   </label>
                                 )}
                                 {r.requiresApproval && (
                                   <label className="inline-flex items-center gap-1">
                                     <input type="checkbox" checked={approved} onChange={(e) => void toggleApproval(v.id, r.id, e.target.checked)} />
-                                    <span className="text-foreground/70">Approved</span>
+                                    <span className="text-foreground/70">{t("Approved")}</span>
                                   </label>
                                 )}
                               </div>
