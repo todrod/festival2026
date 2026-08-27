@@ -71,6 +71,18 @@ body {
   background: radial-gradient(circle at top right, #274a82 0%, var(--background) 52%);
 }
 
+/* Native <select> dropdowns: make the open option list legible (was rendering
+   light text on a light system background). */
+select {
+  color: var(--foreground);
+}
+
+select option,
+select optgroup {
+  color: var(--foreground);
+  background-color: var(--card);
+}
+
 .admin-theme {
   --background: #122039;
   --foreground: #f9fafb;
