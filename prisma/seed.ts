@@ -1,4 +1,5 @@
 import { PrismaClient, RoleModule, ShiftType } from "@prisma/client";
+import { format } from "date-fns";
 import { FESTIVAL_END, FESTIVAL_NAME, FESTIVAL_START, ROLE_SEEDS, SHIFT_SEEDS, atDayTime, festivalDates } from "../src/lib/festival";
 
 const prisma = new PrismaClient();
@@ -93,7 +94,9 @@ async function main() {
     }
   }
 
-  console.log("Seed completed for festival dates Feb 26 - Mar 8, 2026");
+  console.log(
+    `Seed completed for festival dates ${format(FESTIVAL_START, "MMM d")} - ${format(FESTIVAL_END, "MMM d, yyyy")}`,
+  );
 }
 
 main()

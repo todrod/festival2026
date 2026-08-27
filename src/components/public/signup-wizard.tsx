@@ -231,7 +231,7 @@ export function SignupWizard({ shifts, roles }: Props) {
             </div>
           </div>
           <div>
-            <h2 className="text-3xl font-black leading-tight text-strawberry-900">Volunteer for the 2026 St. Clement Strawberry Festival!</h2>
+            <h2 className="text-3xl font-black leading-tight text-strawberry-900">Volunteer for the 2027 St. Clement Strawberry Festival!</h2>
             <p className="mt-2 text-lg text-foreground/85">Select your role below. Simple for young & old.</p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               {[
@@ -331,7 +331,7 @@ export function SignupWizard({ shifts, roles }: Props) {
 
       {activeStep === 2 && <div id="dates" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
         <h3 className="text-xl font-black text-strawberry-900">2) Festival Dates & Requirements</h3>
-        <p className="text-sm text-foreground/85">Start date is Feb 26 - March 8, 2026</p>
+        <p className="text-sm text-foreground/85">Festival runs March 4 - March 14, 2027</p>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
           {shiftsByDate.map(([date, items]) => (
             <div key={date} className="rounded-xl border border-strawberry-100 bg-background p-2">
