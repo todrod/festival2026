@@ -70,11 +70,13 @@ function PoolCard({
   selected,
   volunteerCode,
   fitSummary,
+  reliability,
 }: {
   volunteer: Volunteer;
   selected: boolean;
   volunteerCode: string;
   fitSummary: string;
+  reliability: ReturnType<typeof reliabilityInfo>;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `pool:${volunteer.id}`,
@@ -103,6 +105,14 @@ function PoolCard({
           );
         })()}
       </div>
+      <div className="mt-0.5">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${reliability.className}`}
+          title={reliability.assigned > 0 ? `${reliability.attended} checked in · ${reliability.noShows} no-show` : "No shifts yet"}
+        >
+          <span aria-hidden>{reliability.emoji}</span> {reliability.label}
+        </span>
+      </div>
       <div className="mt-1 flex items-center justify-between gap-2">
         <span className="rounded bg-strawberry-100 px-1.5 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/35">
           {volunteerCode}
@@ -113,6 +123,19 @@ function PoolCard({
       </div>
     </button>
   );
+}
+
+type ReliabilityStats = { assigned: number; attended: number; noShows: number };
+
+function reliabilityInfo(stats?: ReliabilityStats) {
+  const s = stats ?? { assigned: 0, attended: 0, noShows: 0 };
+  if (s.assigned === 0) {
+    return { ...s, label: "New", emoji: "🆕", className: "bg-slate-200 text-slate-800" };
+  }
+  if (s.noShows > 0) {
+    return { ...s, label: "Watch", emoji: "⚠️", className: "bg-amber-200 text-amber-950" };
+  }
+  return { ...s, label: "Reliable", emoji: "✅", className: "bg-emerald-200 text-emerald-950" };
 }
 
 function roleHealth(count: number, target: number) {
@@ -465,6 +488,20 @@ export function AdminDashboard() {
     return { availByVolunteer, assignByVolunteer };
   }, [data]);
 
+  const reliabilityByVolunteer = useMemo(() => {
+    const m = new Map<string, ReliabilityStats>();
+    if (data) {
+      for (const a of data.assignments) {
+        const r = m.get(a.volunteerId) ?? { assigned: 0, attended: 0, noShows: 0 };
+        r.assigned += 1;
+        if (a.checkedInAt) r.attended += 1;
+        if (a.noShow) r.noShows += 1;
+        m.set(a.volunteerId, r);
+      }
+    }
+    return m;
+  }, [data]);
+
   const roster = useMemo(() => {
     if (!data) return [];
     const q = rosterSearch.trim().toLowerCase();
@@ -712,6 +749,16 @@ export function AdminDashboard() {
     setSelectedVolunteerId(volunteerId);
     setInspectorRoleId(roleId);
     await load();
+  }
+
+  async function saveNote(volunteerId: string, notes: string) {
+    const res = await fetch("/api/admin/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volunteerId, notes }),
+    });
+    setMessage(res.ok ? "Note saved." : "Failed to save note.");
+    if (res.ok) await load();
   }
 
   async function toggleTraining(volunteerId: string, roleId: string, trained: boolean) {
@@ -1167,6 +1214,7 @@ export function AdminDashboard() {
                           selected={selectedVolunteerId === vol.id}
                           volunteerCode={volunteerCodeMap.get(vol.id) || `V-${vol.id.slice(-4).toUpperCase()}`}
                           fitSummary={getVolunteerFit(vol.id, selectedRoleFilterIds).summary}
+                          reliability={reliabilityInfo(reliabilityByVolunteer.get(vol.id))}
                         />
                       </div>
                     ))}
@@ -1264,6 +1312,27 @@ export function AdminDashboard() {
                         <p>Heavy lift: {selectedVolunteer.acknowledgement?.heavyLift50 ? "Yes" : "No"}</p>
                         <p>Cash: {selectedVolunteer.acknowledgement?.cashHandling ? "Yes" : "No"}</p>
                         <p>Outdoor: {selectedVolunteer.acknowledgement?.outdoorSun ? "Yes" : "No"}</p>
+                      </div>
+                      <div className="rounded border border-strawberry-100 p-2">
+                        <p className="font-semibold">Reliability</p>
+                        {(() => {
+                          const info = reliabilityInfo(reliabilityByVolunteer.get(selectedVolunteer.id));
+                          return (
+                            <p className="mt-1">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
+                                <span aria-hidden>{info.emoji}</span> {info.label}
+                              </span>
+                              {info.assigned > 0
+                                ? ` · ${info.attended} checked in / ${info.noShows} no-show of ${info.assigned}`
+                                : " · no shifts yet"}
+                            </p>
+                          );
+                        })()}
+                        {selectedVolunteer.adminNotes && (
+                          <p className="mt-1">
+                            <span className="font-semibold">Note:</span> {selectedVolunteer.adminNotes}
+                          </p>
+                        )}
                       </div>
                       {selectedRole && (
                         <div className="rounded border border-leaf-300 bg-leaf-200/40 p-2">
@@ -1379,7 +1448,7 @@ export function AdminDashboard() {
             />
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[1040px] text-sm">
               <thead>
                 <tr className="border-b border-strawberry-100 text-left text-xs uppercase tracking-wide text-foreground/60">
                   <th className="p-2">Name</th>
@@ -1390,6 +1459,8 @@ export function AdminDashboard() {
                   <th className="p-2">Can do</th>
                   <th className="p-2 text-center">Avail</th>
                   <th className="p-2 text-center">Assigned</th>
+                  <th className="p-2">Reliability</th>
+                  <th className="p-2">Notes (admin only)</th>
                 </tr>
               </thead>
               <tbody>
@@ -1436,12 +1507,39 @@ export function AdminDashboard() {
                       </td>
                       <td className="p-2 text-center tabular-nums">{volunteerCounts.availByVolunteer.get(v.id) ?? 0}</td>
                       <td className="p-2 text-center tabular-nums">{volunteerCounts.assignByVolunteer.get(v.id) ?? 0}</td>
+                      <td className="p-2">
+                        {(() => {
+                          const info = reliabilityInfo(reliabilityByVolunteer.get(v.id));
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
+                                <span aria-hidden>{info.emoji}</span> {info.label}
+                              </span>
+                              {info.assigned > 0 && (
+                                <span className="text-[10px] text-foreground/60">
+                                  {info.attended} in · {info.noShows} no-show{info.noShows === 1 ? "" : "s"}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="p-2">
+                        <input
+                          defaultValue={v.adminNotes ?? ""}
+                          onBlur={(e) => {
+                            if (e.target.value.trim() !== (v.adminNotes ?? "").trim()) void saveNote(v.id, e.target.value);
+                          }}
+                          placeholder="Add a note…"
+                          className="w-44 rounded-md border border-strawberry-200 bg-background px-2 py-1 text-xs"
+                        />
+                      </td>
                     </tr>
                   );
                 })}
                 {roster.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="p-4 text-center text-foreground/60">
+                    <td colSpan={10} className="p-4 text-center text-foreground/60">
                       No volunteers match your search.
                     </td>
                   </tr>

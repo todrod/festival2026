@@ -354,6 +354,18 @@ export async function autoAssignShift(shiftId: string) {
     .filter((v, idx, arr) => arr.findIndex((x) => x.id === v.id) === idx);
 
   const availableVolunteerIds = availableVolunteers.map((v) => v.id);
+
+  // Reliability: count prior no-shows so chronic no-shows are gently
+  // deprioritized in the score (seniority still wins across tiers).
+  const noShowAssignments = await prisma.assignment.findMany({
+    where: { volunteerId: { in: availableVolunteerIds }, noShow: true },
+    select: { volunteerId: true },
+  });
+  const noShowCountByVolunteer = new Map<string, number>();
+  for (const a of noShowAssignments) {
+    noShowCountByVolunteer.set(a.volunteerId, (noShowCountByVolunteer.get(a.volunteerId) ?? 0) + 1);
+  }
+
   const sameDayAssignments = await prisma.assignment.findMany({
     where: {
       volunteerId: { in: availableVolunteerIds },
@@ -427,11 +439,14 @@ export async function autoAssignShift(shiftId: string) {
           include: { preferences: true };
         }>).preferences.find((p) => p.roleId === target.roleId);
         // Seniority is the primary priority: tier first, then years within the
-        // tier, then role preference as a tie-break, then a stable jitter.
+        // tier, then a no-show penalty and role preference as tie-breaks, then a
+        // stable jitter. A no-show costs ~1.2 years of standing within the tier,
+        // but never bumps someone below a lower tier.
         const tier = seniorityTier(volunteer.yearsExperience);
         const rankScore = pref ? 11 - pref.rank : 0; // 1..10 for a ranked pick, 0 otherwise
+        const noShowPenalty = (noShowCountByVolunteer.get(volunteer.id) ?? 0) * 120;
         const stable = Number.parseInt(volunteer.id.slice(-3), 36) % 7;
-        const score = tier.rank * 100000 + volunteer.yearsExperience * 100 + rankScore + stable / 10;
+        const score = tier.rank * 100000 + volunteer.yearsExperience * 100 - noShowPenalty + rankScore + stable / 10;
         scored.push({ volunteer, score });
       }
 
