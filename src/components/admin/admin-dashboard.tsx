@@ -874,6 +874,26 @@ export function AdminDashboard() {
         </div>
       </div>
 
+      <div className="no-print flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-foreground/60">{t("Area")}</span>
+        {([
+          ["ALL", t("All")],
+          ["BOOTH", t("Booth")],
+          ["HALL", t("Hall")],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => {
+              setModuleFilter(key);
+              setCoverageModuleFilter(key);
+            }}
+            className={`rounded-md px-3 py-1 text-sm font-semibold ${moduleFilter === key ? "bg-leaf-500 text-white" : "bg-strawberry-50/80 text-foreground dark:bg-strawberry-100/25"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {tab === "coverage" && data && (
         <section className="space-y-3">
           <div className="panel p-3">

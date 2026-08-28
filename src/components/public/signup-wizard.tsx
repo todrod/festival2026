@@ -59,6 +59,7 @@ export function SignupWizard({ shifts, roles }: Props) {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [prefMode, setPrefMode] = useState<PrefMode>("BOOTH_DAY");
+  const [areaTab, setAreaTab] = useState<"BOOTH" | "HALL">("BOOTH");
   const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
   const [form, setForm] = useState({
@@ -155,6 +156,13 @@ export function SignupWizard({ shifts, roles }: Props) {
     setSelectedShiftIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  // Booth and Hall are run in different areas; the area tab scopes the Dates and
+  // Jobs steps. Switching areas keeps the job pref-mode valid for that area.
+  function selectArea(area: "BOOTH" | "HALL") {
+    setAreaTab(area);
+    setPrefMode(area === "HALL" ? "HALL" : "BOOTH_DAY");
+  }
+
   function applyRole(role: Role) {
     if (prefMode === "BOOTH_DAY") setBoothDayPref((prev) => upsertPref(prev, role));
     else if (prefMode === "BOOTH_NIGHT") setBoothNightPref((prev) => upsertPref(prev, role));
@@ -219,6 +227,24 @@ export function SignupWizard({ shifts, roles }: Props) {
       </section>
     );
   }
+
+  const areaToggle = (
+    <div className="mb-3">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-strawberry-300">{t("Which area?")}</p>
+      <div className="flex gap-2">
+        {(["BOOTH", "HALL"] as const).map((a) => (
+          <button
+            key={a}
+            type="button"
+            onClick={() => selectArea(a)}
+            className={`rounded-full px-5 py-2 text-sm font-bold ${areaTab === a ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"}`}
+          >
+            {a === "BOOTH" ? t("Booth") : t("Hall")}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -338,32 +364,27 @@ export function SignupWizard({ shifts, roles }: Props) {
       {activeStep === 2 && <div id="dates" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
         <h3 className="text-xl font-black text-strawberry-900">{t("2) Festival Dates & Requirements")}</h3>
         <p className="text-sm text-foreground/85">{t("Festival runs March 4 - March 14, 2027")}</p>
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          {shiftsByDate.map(([date, items]) => (
-            <div key={date} className="rounded-xl border border-strawberry-100 bg-background p-2">
-              <p className="text-xs font-bold uppercase text-strawberry-300">{format(new Date(`${date}T00:00:00`), "EEE")}</p>
-              <p className="text-lg font-black text-strawberry-900">{format(new Date(`${date}T00:00:00`), "d")}</p>
-              <div className="mt-1 space-y-2">
-                {(["BOOTH", "HALL"] as const).map((mod) => {
-                  const groupItems = items.filter((s) => s.module === mod);
-                  if (groupItems.length === 0) return null;
-                  return (
-                    <div key={mod}>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-strawberry-300">{mod === "BOOTH" ? t("Booth") : t("Hall")}</p>
-                      <div className="space-y-1">
-                        {groupItems.map((shift) => (
-                          <label key={shift.id} className="flex items-center gap-2 text-xs text-foreground/90">
-                            <input type="checkbox" checked={selectedShiftIds.includes(shift.id)} onChange={() => toggleShift(shift.id)} />
-                            {t(shift.label)}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+        {areaToggle}
+        <p className="mb-2 text-xs text-foreground/70">{t("Pick your days below. You can switch area to add shifts from the other area too.")}</p>
+        <div className="mt-1 grid gap-2 md:grid-cols-3">
+          {shiftsByDate.map(([date, items]) => {
+            const areaItems = items.filter((s) => s.module === areaTab);
+            if (areaItems.length === 0) return null;
+            return (
+              <div key={date} className="rounded-xl border border-strawberry-100 bg-background p-2">
+                <p className="text-xs font-bold uppercase text-strawberry-300">{format(new Date(`${date}T00:00:00`), "EEE")}</p>
+                <p className="text-lg font-black text-strawberry-900">{format(new Date(`${date}T00:00:00`), "d")}</p>
+                <div className="mt-1 space-y-1">
+                  {areaItems.map((shift) => (
+                    <label key={shift.id} className="flex items-center gap-2 text-xs text-foreground/90">
+                      <input type="checkbox" checked={selectedShiftIds.includes(shift.id)} onChange={() => toggleShift(shift.id)} />
+                      {t(shift.label)}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-4 grid gap-2 text-xs md:grid-cols-3">
@@ -379,11 +400,13 @@ export function SignupWizard({ shifts, roles }: Props) {
 
       {activeStep === 3 && <div id="jobs" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
         <h3 className="text-xl font-black text-strawberry-900">{t("3) Job Selection")}</h3>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button onClick={() => setPrefMode("BOOTH_DAY")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_DAY" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Day")}</button>
-          <button onClick={() => setPrefMode("BOOTH_NIGHT")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_NIGHT" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Night")}</button>
-          <button onClick={() => setPrefMode("HALL")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "HALL" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Hall")}</button>
-        </div>
+        {areaToggle}
+        {areaTab === "BOOTH" && (
+          <div className="mt-1 flex flex-wrap gap-2">
+            <button onClick={() => setPrefMode("BOOTH_DAY")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_DAY" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Day")}</button>
+            <button onClick={() => setPrefMode("BOOTH_NIGHT")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_NIGHT" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Night")}</button>
+          </div>
+        )}
 
         <div className="mt-3 grid gap-2 md:grid-cols-4">
           {activeRoles.map((role) => {
@@ -419,27 +442,29 @@ export function SignupWizard({ shifts, roles }: Props) {
             </ul>
           )}
         </div>
-        <div className="mt-4 rounded-xl border border-strawberry-100 bg-background p-3 text-sm">
-          <p className="font-semibold text-strawberry-900">{t("Willing to do any role if needed")}</p>
-          <div className="mt-2 flex flex-wrap gap-4">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.willingAnyBoothDay}
-                onChange={(e) => setForm((p) => ({ ...p, willingAnyBoothDay: e.target.checked }))}
-              />
-              {t("Booth Day")}
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.willingAnyBoothNight}
-                onChange={(e) => setForm((p) => ({ ...p, willingAnyBoothNight: e.target.checked }))}
-              />
-              {t("Booth Night")}
-            </label>
+        {areaTab === "BOOTH" && (
+          <div className="mt-4 rounded-xl border border-strawberry-100 bg-background p-3 text-sm">
+            <p className="font-semibold text-strawberry-900">{t("Willing to do any role if needed")}</p>
+            <div className="mt-2 flex flex-wrap gap-4">
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.willingAnyBoothDay}
+                  onChange={(e) => setForm((p) => ({ ...p, willingAnyBoothDay: e.target.checked }))}
+                />
+                {t("Booth Day")}
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.willingAnyBoothNight}
+                  onChange={(e) => setForm((p) => ({ ...p, willingAnyBoothNight: e.target.checked }))}
+                />
+                {t("Booth Night")}
+              </label>
+            </div>
           </div>
-        </div>
+        )}
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">{t("Back")}</button>
           <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>

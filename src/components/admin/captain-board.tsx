@@ -22,6 +22,7 @@ export function CaptainBoard() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | CheckinStatus>("ALL");
+  const [areaFilter, setAreaFilter] = useState<"ALL" | "BOOTH" | "HALL">("ALL");
 
   async function load() {
     const res = await fetch("/api/admin/data", { cache: "no-store" });
@@ -38,6 +39,17 @@ export function CaptainBoard() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const areaShifts = useMemo(
+    () => (data?.shifts || []).filter((s) => areaFilter === "ALL" || s.module === areaFilter),
+    [data, areaFilter],
+  );
+
+  useEffect(() => {
+    if (areaShifts.length && !areaShifts.some((s) => s.id === shiftId)) {
+      setShiftId(areaShifts[0].id);
+    }
+  }, [areaShifts, shiftId]);
 
   const selectedShift = useMemo(() => data?.shifts.find((s) => s.id === shiftId) || null, [data, shiftId]);
   const assignments = useMemo(() => {
@@ -105,18 +117,33 @@ export function CaptainBoard() {
         <h1 className="text-3xl font-black tracking-tight text-foreground">{t("Shift Supervisor Mode")}</h1>
         <p className="text-sm text-foreground/90">{t("Mobile-first check-in and no-show handling during active shifts.")}</p>
       </div>
-      <div className="panel sticky top-14 z-10 p-3">
+      <div className="panel sticky top-14 z-10 space-y-2 p-3">
+        <div className="flex gap-1.5">
+          {([
+            ["ALL", t("All")],
+            ["BOOTH", t("Booth")],
+            ["HALL", t("Hall")],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setAreaFilter(key)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${areaFilter === key ? "bg-strawberry-500 text-white" : "border border-strawberry-300"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <label className="text-sm">
           <span className="mb-1 block font-semibold">{t("Shift")}</span>
           <select className="w-full rounded-md border border-strawberry-200 px-2 py-2" value={shiftId} onChange={(e) => setShiftId(e.target.value)}>
-            {(data?.shifts || []).map((s) => (
+            {areaShifts.map((s) => (
               <option key={s.id} value={s.id}>
                 {format(new Date(s.date), "EEE MMM d")} - {t(s.label)}
               </option>
             ))}
           </select>
         </label>
-        {selectedShift && <p className="mt-2 text-xs text-foreground/85">{t("Active shift:")} {t(selectedShift.label)}</p>}
+        {selectedShift && <p className="mt-1 text-xs text-foreground/85">{t("Active shift:")} {t(selectedShift.label)}</p>}
       </div>
 
       {selectedShift && (

@@ -457,4 +457,10 @@ export const ES: Record<string, string> = {
   "Failed to send reminders": "Error al enviar recordatorios",
   "Confirmed via text": "Confirmado por texto",
   "Cancelled via text": "Cancelado por texto",
+
+  // --- Booth/Hall area separation ---
+  "Which area?": "¿Qué área?",
+  "Pick your days below. You can switch area to add shifts from the other area too.":
+    "Elija sus días abajo. Puede cambiar de área para agregar turnos de la otra área también.",
+  Area: "Área",
 };
