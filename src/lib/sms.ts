@@ -42,7 +42,7 @@ function getTwilioConfig() {
   return { accountSid, apiKeySid, apiKeySecret, messagingServiceSid, from };
 }
 
-export async function sendSms({ to, body }: SendSmsArgs): Promise<{ sent: boolean }> {
+export async function sendSms({ to, body }: SendSmsArgs): Promise<{ sent: boolean; sid?: string }> {
   const cfg = getTwilioConfig();
   if (!cfg) {
     console.info(`[sms] Twilio not configured — would have texted ${to}: ${body}`);
@@ -52,14 +52,14 @@ export async function sendSms({ to, body }: SendSmsArgs): Promise<{ sent: boolea
   const twilio = (await import("twilio")).default;
   // API key auth: client(apiKeySid, apiKeySecret, { accountSid }).
   const client = twilio(cfg.apiKeySid, cfg.apiKeySecret, { accountSid: cfg.accountSid });
-  await client.messages.create({
+  const message = await client.messages.create({
     to,
     body,
     ...(cfg.messagingServiceSid
       ? { messagingServiceSid: cfg.messagingServiceSid }
       : { from: cfg.from }),
   });
-  return { sent: true };
+  return { sent: true, sid: message.sid };
 }
 
 // Short signup-confirmation text. Kept concise and carries the STOP opt-out that

@@ -45,6 +45,12 @@ enum AbsenceReason {
   OTHER
 }
 
+enum ConfirmationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
 enum VolunteerStatus {
   PENDING
   VERIFIED
@@ -85,6 +91,7 @@ model Volunteer {
   trainings       Training[]
   approvals       Approval[]
   assignments     Assignment[]
+  reminderLogs    ReminderLog[]
 
   @@index([lastName, firstName])
   @@unique([email])
@@ -132,6 +139,7 @@ model Shift {
   preferences  Preference[]
   assignments  Assignment[]
   roleTargets  RoleTarget[]
+  reminderLogs ReminderLog[]
 
   @@unique([date, shiftType])
   @@index([date, module])
@@ -226,6 +234,8 @@ model Assignment {
   noShow         Boolean  @default(false)
   absenceReason  AbsenceReason?
   absenceNote    String?  @db.Text
+  confirmationStatus ConfirmationStatus @default(PENDING)
+  confirmationAt DateTime?
   forceAssigned  Boolean  @default(false)
   overrideReason String?
   createdAt      DateTime @default(now())
@@ -264,4 +274,22 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([shiftId, createdAt])
+}
+
+// One row per reminder text sent, used to (a) dedupe so re-runs don't double-text
+// and (b) route an inbound YES/NO reply to the right shift (latest reminder for
+// that volunteer's phone).
+model ReminderLog {
+  id          String   @id @default(cuid())
+  volunteerId String
+  shiftId     String
+  channel     String   @default("sms")
+  providerSid String?
+  createdAt   DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+  shift     Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId, createdAt])
+  @@index([shiftId])
 }

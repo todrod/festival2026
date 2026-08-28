@@ -431,4 +431,30 @@ export const ES: Record<string, string> = {
   "Ineligible for role": "No elegible para el rol",
   "Note saved.": "Nota guardada.",
   "Failed to save note.": "No se pudo guardar la nota.",
+
+  // --- Supervisor check-in board (enhancements) ---
+  "to go": "por llegar",
+  absent: "ausentes",
+  "Search name": "Buscar nombre",
+  "Not in": "Por llegar",
+  In: "Presentes",
+  Absent: "Ausente",
+  Confirmed: "Confirmado",
+  Cancelled: "Cancelado",
+  "No one matches these filters.": "Nadie coincide con estos filtros.",
+
+  // --- Shift reminders (admin) ---
+  "Send Shift Reminders": "Enviar recordatorios de turno",
+  "Texts assigned volunteers who opted in. They can reply YES to confirm or NO to cancel.":
+    "Envía un texto a los voluntarios asignados que aceptaron. Pueden responder YES para confirmar o NO para cancelar.",
+  Send: "Enviar",
+  "Sending…": "Enviando…",
+  "to text": "por enviar",
+  already: "ya enviados",
+  "no opt-in": "sin aceptar mensajes",
+  "no valid phone": "sin teléfono válido",
+  "Reminders sent:": "Recordatorios enviados:",
+  "Failed to send reminders": "Error al enviar recordatorios",
+  "Confirmed via text": "Confirmado por texto",
+  "Cancelled via text": "Cancelado por texto",
 };

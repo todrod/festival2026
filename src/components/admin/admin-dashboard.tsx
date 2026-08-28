@@ -2,7 +2,7 @@
 
 import type { Role, Volunteer } from "@prisma/client";
 import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDataResponse } from "@/types/app";
@@ -225,6 +225,9 @@ export function AdminDashboard() {
   const [coverageModuleFilter, setCoverageModuleFilter] = useState<ModuleFilter>("ALL");
   const [openCoverageDate, setOpenCoverageDate] = useState<string | null>(null);
   const [rosterSearch, setRosterSearch] = useState("");
+  const [reminderDate, setReminderDate] = useState<string>(() => format(addDays(new Date(), 1), "yyyy-MM-dd"));
+  const [reminderPreview, setReminderPreview] = useState<{ eligible: number; alreadyReminded: number; noOptIn: number; badPhone: number } | null>(null);
+  const [reminderBusy, setReminderBusy] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/data", { cache: "no-store" });
@@ -286,6 +289,15 @@ export function AdminDashboard() {
       setOpenCoverageDate(null);
     }
   }, [coverageDateFilter]);
+
+  const previewReminders = useCallback(async (date: string) => {
+    const res = await fetch(`/api/admin/send-reminders?date=${date}`, { cache: "no-store" });
+    setReminderPreview(res.ok ? await res.json() : null);
+  }, []);
+
+  useEffect(() => {
+    if (authed) void previewReminders(reminderDate);
+  }, [authed, reminderDate, previewReminders]);
 
   const selectedShift = useMemo(() => data?.shifts.find((s) => s.id === shiftId) ?? null, [data, shiftId]);
   const roleTargets = useMemo(() => (data ? data.roleTargets.filter((r) => r.shiftId === shiftId) : []), [data, shiftId]);
@@ -793,6 +805,24 @@ export function AdminDashboard() {
     setData(null);
   }
 
+  async function sendReminders() {
+    setReminderBusy(true);
+    const res = await fetch("/api/admin/send-reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: reminderDate }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    setMessage(
+      res.ok
+        ? `${t("Reminders sent:")} ${payload.sent ?? 0} · ${payload.skippedAlready ?? 0} ${t("already")} · ${payload.skippedNoOptIn ?? 0} ${t("no opt-in")}`
+        : payload.error || t("Failed to send reminders"),
+    );
+    setReminderBusy(false);
+    await previewReminders(reminderDate);
+    await load();
+  }
+
   if (!authed) {
     return (
       <section className="panel max-w-md p-5">
@@ -972,6 +1002,35 @@ export function AdminDashboard() {
 
       {tab === "schedule" && data && (
         <section className="space-y-4">
+          <div className="no-print panel p-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-[220px] flex-1">
+                <p className="text-sm font-semibold">{t("Send Shift Reminders")}</p>
+                <p className="text-xs text-foreground/70">{t("Texts assigned volunteers who opted in. They can reply YES to confirm or NO to cancel.")}</p>
+              </div>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold">{t("Date")}</span>
+                <input
+                  type="date"
+                  value={reminderDate}
+                  onChange={(e) => setReminderDate(e.target.value)}
+                  className="rounded-md border border-strawberry-200 px-2 py-2 text-sm"
+                />
+              </label>
+              <button
+                disabled={reminderBusy || !reminderPreview || reminderPreview.eligible === 0}
+                onClick={() => void sendReminders()}
+                className="rounded-md bg-strawberry-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {reminderBusy ? t("Sending…") : `${t("Send")}${reminderPreview ? ` (${reminderPreview.eligible})` : ""}`}
+              </button>
+            </div>
+            {reminderPreview && (
+              <p className="mt-2 text-xs text-foreground/70">
+                {reminderPreview.eligible} {t("to text")} · {reminderPreview.alreadyReminded} {t("already")} · {reminderPreview.noOptIn} {t("no opt-in")} · {reminderPreview.badPhone} {t("no valid phone")}
+              </p>
+            )}
+          </div>
           {scheduleSummary && (
             <div className="panel grid gap-2 p-3 text-sm md:grid-cols-5">
               <div className="rounded-md bg-strawberry-50/80 px-3 py-2 text-foreground dark:bg-strawberry-100/25">
@@ -1288,6 +1347,8 @@ export function AdminDashboard() {
                           >
                             <span>
                               {a.volunteer.firstName} {a.volunteer.lastName}
+                              {a.confirmationStatus === "CONFIRMED" && <span title={t("Confirmed via text")} className="ml-1 text-emerald-600">✓</span>}
+                              {a.confirmationStatus === "CANCELLED" && <span title={t("Cancelled via text")} className="ml-1 font-bold text-rose-600">✕</span>}
                             </span>
                             {a.forceAssigned && <span className="text-xs text-orange-700 dark:text-orange-200">{t("FORCED")}</span>}
                           </button>

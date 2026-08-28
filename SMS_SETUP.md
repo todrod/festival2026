@@ -42,10 +42,37 @@ local testing). Unset = log-only (no text sent).
 | `TWILIO_API_KEY_SECRET` | The API key secret. **Shown only once** at creation — copy it straight into the env. |
 | `TWILIO_MESSAGING_SERVICE_SID` | `MG...` — preferred sender; carries the 10DLC campaign. Find it under **Messaging → Services**. |
 | `TWILIO_FROM_NUMBER` | `+1727...` — fallback sender if you don't set a messaging service. |
+| `CRON_SECRET` | Any long random string. Protects the daily reminder cron; Vercel sends it as a Bearer token. |
+| `SMS_WEBHOOK_SECRET` | Any random string. Require `?key=<this>` on the Twilio inbound webhook URL so only Twilio can post to it. |
 
 We use an **API key** (SID + secret) rather than the account Auth Token so the
 master token is never embedded in the app. Prefer the **Messaging Service SID**
 over the from-number — that's what the 10DLC campaign is attached to.
+
+## Shift reminders + confirm/cancel
+
+The app can text assigned volunteers a **day-before reminder** and let them reply
+**YES** (confirm) or **NO** (cancel):
+
+- **Manual:** Admin → **Day Detail + Board** tab → **Send Shift Reminders** panel.
+  Pick a date (defaults to tomorrow), see how many will be texted, and Send.
+- **Automatic:** a daily Vercel Cron (`vercel.json` → `/api/cron/send-reminders`,
+  13:00 UTC ≈ 9am ET) texts *tomorrow's* assigned volunteers. Re-sends are
+  de-duped, so the cron and a manual send won't double-text.
+- **Replies:** a volunteer's YES/NO updates their assignment to **Confirmed** or
+  **Cancelled**, shown as a ✓/✕ on the board and a "Confirmed via text" badge in
+  the supervisor check-in board. Cancellations are flagged so you can backfill.
+
+### One-time Twilio setup for replies (inbound webhook)
+
+Point the number's inbound handler at the deployed app so replies are processed:
+
+1. Twilio console → **Phone Numbers → Manage → Active numbers → +1 727 220 2167**
+   → **Messaging** → "A message comes in" → **Webhook (HTTP POST)**:
+   `https://festival2026-ten.vercel.app/api/sms/inbound?key=<SMS_WEBHOOK_SECRET>`
+   (If the number is in a Messaging Service, set the same URL under the Messaging
+   Service's **Integration** → "Send a webhook" instead.)
+2. Set `SMS_WEBHOOK_SECRET` and `CRON_SECRET` in Vercel env.
 
 ## Testing before 10DLC is approved
 

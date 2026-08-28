@@ -6,12 +6,22 @@ import type { AdminDataResponse } from "@/types/app";
 import { ABSENCE_OPTIONS, absenceLabel, type AbsenceReasonKey } from "@/lib/absence";
 import { useLang } from "@/components/i18n/language-provider";
 
+type CheckinStatus = "OUT" | "IN" | "ABSENT";
+function checkinStatus(a: { noShow: boolean; checkedInAt: Date | string | null }): CheckinStatus {
+  if (a.noShow) return "ABSENT";
+  if (a.checkedInAt) return "IN";
+  return "OUT";
+}
+const STATUS_WEIGHT: Record<CheckinStatus, number> = { OUT: 0, IN: 1, ABSENT: 2 };
+
 export function CaptainBoard() {
   const { t } = useLang();
   const [data, setData] = useState<AdminDataResponse | null>(null);
   const [shiftId, setShiftId] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | CheckinStatus>("ALL");
 
   async function load() {
     const res = await fetch("/api/admin/data", { cache: "no-store" });
@@ -35,13 +45,41 @@ export function CaptainBoard() {
     return data.assignments.filter((a) => a.shiftId === shiftId);
   }, [data, shiftId]);
 
+  const stats = useMemo(() => {
+    let inCount = 0;
+    let absentCount = 0;
+    let outCount = 0;
+    for (const a of assignments) {
+      const s = checkinStatus(a);
+      if (s === "IN") inCount += 1;
+      else if (s === "ABSENT") absentCount += 1;
+      else outCount += 1;
+    }
+    return { inCount, absentCount, outCount, total: assignments.length };
+  }, [assignments]);
+
   const byRole = useMemo(() => {
-    return assignments.reduce<Record<string, typeof assignments>>((acc, a) => {
+    const q = search.trim().toLowerCase();
+    const filtered = assignments.filter((a) => {
+      if (statusFilter !== "ALL" && checkinStatus(a) !== statusFilter) return false;
+      if (!q) return true;
+      const name = `${a.volunteer.firstName} ${a.volunteer.lastName}`.toLowerCase();
+      return name.includes(q) || a.volunteer.phone.toLowerCase().includes(q);
+    });
+    const grouped = filtered.reduce<Record<string, typeof assignments>>((acc, a) => {
       if (!acc[a.role.name]) acc[a.role.name] = [];
       acc[a.role.name].push(a);
       return acc;
     }, {});
-  }, [assignments]);
+    // Float people who still need attention (not checked in) to the top.
+    for (const list of Object.values(grouped)) {
+      list.sort((a, b) => {
+        const w = STATUS_WEIGHT[checkinStatus(a)] - STATUS_WEIGHT[checkinStatus(b)];
+        return w !== 0 ? w : a.volunteer.lastName.localeCompare(b.volunteer.lastName);
+      });
+    }
+    return grouped;
+  }, [assignments, search, statusFilter]);
 
   async function updateCheckin(
     assignmentId: string,
@@ -81,6 +119,38 @@ export function CaptainBoard() {
         {selectedShift && <p className="mt-2 text-xs text-foreground/85">{t("Active shift:")} {t(selectedShift.label)}</p>}
       </div>
 
+      {selectedShift && (
+        <div className="panel space-y-3 p-3">
+          <div className="flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="rounded-full bg-leaf-200 px-2.5 py-1 text-leaf-800">{stats.inCount}/{stats.total} {t("checked in")}</span>
+            <span className="rounded-full bg-amber-200 px-2.5 py-1 text-amber-900">{stats.absentCount} {t("absent")}</span>
+            <span className="rounded-full bg-strawberry-100 px-2.5 py-1 text-foreground dark:bg-strawberry-100/35">{stats.outCount} {t("to go")}</span>
+          </div>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("Search name")}
+            className="w-full rounded-md border border-strawberry-200 px-2 py-2 text-sm"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {([
+              ["ALL", t("All")],
+              ["OUT", t("Not in")],
+              ["IN", t("In")],
+              ["ABSENT", t("Absent")],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${statusFilter === key ? "bg-strawberry-500 text-white" : "border border-strawberry-300"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {Object.entries(byRole).map(([role, list]) => (
         <div key={role} className="panel p-3">
           <h3 className="mb-2 text-lg font-bold">{t(role)}</h3>
@@ -89,6 +159,12 @@ export function CaptainBoard() {
               <div key={a.id} className="rounded-lg border border-strawberry-100 bg-card p-2 text-sm text-foreground">
                 <p className="font-semibold">
                   {a.volunteer.firstName} {a.volunteer.lastName}
+                  {a.confirmationStatus === "CONFIRMED" && (
+                    <span className="ml-2 inline-block rounded-full bg-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-900">✓ {t("Confirmed")}</span>
+                  )}
+                  {a.confirmationStatus === "CANCELLED" && (
+                    <span className="ml-2 inline-block rounded-full bg-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-900">✕ {t("Cancelled")}</span>
+                  )}
                 </p>
                 <p className="text-xs opacity-80">{a.volunteer.phone}</p>
                 <p className="mt-1 text-xs">
@@ -164,6 +240,10 @@ export function CaptainBoard() {
           </div>
         </div>
       ))}
+
+      {selectedShift && Object.keys(byRole).length === 0 && (
+        <p className="panel p-3 text-sm text-foreground/85">{t("No one matches these filters.")}</p>
+      )}
 
       {message && <p className="rounded-md bg-strawberry-50/80 px-3 py-2 text-sm text-foreground dark:bg-strawberry-100/25">{message}</p>}
     </section>
