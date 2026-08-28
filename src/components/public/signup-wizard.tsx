@@ -360,6 +360,12 @@ export function SignupWizard({ shifts, roles }: Props) {
           <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.textOk} onChange={(e) => setForm((p) => ({ ...p, textOk: e.target.checked }))} /> {t("OK to text me reminders")}</label>
           <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.emailOk} onChange={(e) => setForm((p) => ({ ...p, emailOk: e.target.checked }))} /> {t("OK to email me updates")}</label>
         </div>
+        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-foreground/60">
+          {t("By checking \"OK to text me,\" you agree to receive volunteer scheduling texts (confirmations and shift reminders) from St. Clement Strawberry Festival. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help.")}{" "}
+          <a href="/sms-terms" target="_blank" rel="noreferrer" className="underline">{t("SMS Terms")}</a>
+          {" · "}
+          <a href="/privacy" target="_blank" rel="noreferrer" className="underline">{t("Privacy Policy")}</a>
+        </p>
         <div className="mt-4 flex justify-end">
           <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>
         </div>

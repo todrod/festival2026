@@ -80,6 +80,10 @@ export const ES: Record<string, string> = {
   "Email OK": "Acepto correos electrónicos",
   "OK to text me reminders": "Acepto recibir recordatorios por mensaje de texto",
   "OK to email me updates": "Acepto recibir novedades por correo electrónico",
+  'By checking "OK to text me," you agree to receive volunteer scheduling texts (confirmations and shift reminders) from St. Clement Strawberry Festival. Message frequency varies. Msg & data rates may apply. Reply STOP to opt out, HELP for help.':
+    "Al marcar \"Acepto recibir recordatorios por mensaje de texto\", acepta recibir mensajes de programación de voluntarios (confirmaciones y recordatorios de turno) del Festival de la Fresa de St. Clement. La frecuencia de los mensajes varía. Pueden aplicarse tarifas de mensajes y datos. Responda STOP para cancelar, HELP para ayuda.",
+  "SMS Terms": "Términos de SMS",
+  "Privacy Policy": "Política de privacidad",
   "Your status:": "Su estado:",
   "— more years means higher priority when shifts are assigned.":
     "— más años significan mayor prioridad al asignar los turnos.",
