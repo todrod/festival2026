@@ -29,7 +29,7 @@ const profileFields: Array<{
 }> = [
   { label: "Name", key: "firstName" },
   { label: "Last Name", key: "lastName" },
-  { label: "DOB", key: "dob", type: "date" },
+  { label: "Date of Birth", key: "dob", type: "date" },
   { label: "Phone", key: "phone" },
   { label: "Email", key: "email", type: "email" },
   { label: "Emergency Contact", key: "emergencyContactName" },
@@ -219,8 +219,12 @@ export function SignupWizard({ shifts, roles }: Props) {
   if (result) {
     return (
       <section className="panel rounded-3xl border border-strawberry-100 bg-card p-6">
-        <h2 className="text-2xl font-black text-strawberry-900">{t("You're signed up!")}</h2>
-        <p className="mt-2 text-sm">{t("Confirmation ID:")} {result}</p>
+        <h2 className="text-2xl font-black text-strawberry-900">{t("You're all signed up!")} 🍓</h2>
+        <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+          {t("Thank you for volunteering. A coordinator will review everyone's availability and confirm your specific shifts closer to the festival — nothing more to do for now.")}
+        </p>
+        <p className="mt-2 text-sm text-foreground/85">{t("Watch for a confirmation by text or email.")}</p>
+        <p className="mt-3 text-xs text-foreground/60">{t("Confirmation number:")} {result}</p>
         <button onClick={() => window.print()} className="mt-4 rounded-full bg-strawberry-500 px-6 py-2 text-sm font-semibold text-[#04140b]">
           {t("Print Confirmation")}
         </button>
@@ -353,8 +357,8 @@ export function SignupWizard({ shifts, roles }: Props) {
           </label>
         </div>
         <div className="mt-3 flex flex-wrap gap-3 text-sm">
-          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.textOk} onChange={(e) => setForm((p) => ({ ...p, textOk: e.target.checked }))} /> {t("Text OK")}</label>
-          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.emailOk} onChange={(e) => setForm((p) => ({ ...p, emailOk: e.target.checked }))} /> {t("Email OK")}</label>
+          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.textOk} onChange={(e) => setForm((p) => ({ ...p, textOk: e.target.checked }))} /> {t("OK to text me reminders")}</label>
+          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.emailOk} onChange={(e) => setForm((p) => ({ ...p, emailOk: e.target.checked }))} /> {t("OK to email me updates")}</label>
         </div>
         <div className="mt-4 flex justify-end">
           <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>
@@ -513,7 +517,42 @@ export function SignupWizard({ shifts, roles }: Props) {
         <div className="mt-3 space-y-2 text-sm">
           <p className="rounded-lg bg-background p-2 text-foreground"><strong>{t("Volunteer:")}</strong> {form.firstName} {form.lastName || t("(last name missing)")}</p>
           <p className="rounded-lg bg-background p-2 text-foreground"><strong>{t("Contact:")}</strong> {form.phone || "-"} / {form.email || "-"}</p>
-          <p className="rounded-lg bg-background p-2 text-foreground"><strong>{t("Selected shifts:")}</strong> {selectedShiftIds.length}</p>
+          <div className="rounded-lg bg-background p-2 text-foreground">
+            <strong>{t("Your days:")}</strong>
+            {selectedShiftIds.length === 0 ? (
+              <span> {t("none selected")}</span>
+            ) : (
+              <ul className="mt-1 list-disc pl-5 text-xs">
+                {shifts
+                  .filter((s) => selectedShiftIds.includes(s.id))
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map((s) => (
+                    <li key={s.id}>{format(new Date(s.date), "EEE MMM d")} — {t(s.label)}</li>
+                  ))}
+              </ul>
+            )}
+          </div>
+          {(() => {
+            const prefLines = [
+              ...boothDayPref.map((p) => `${t("Booth Day")}: ${t(p.roleName)}`),
+              ...boothNightPref.map((p) => `${t("Booth Night")}: ${t(p.roleName)}`),
+              ...hallPref.map((p) => `${t("Hall")}: ${t(p.roleName)}`),
+            ];
+            return (
+              <div className="rounded-lg bg-background p-2 text-foreground">
+                <strong>{t("Job preferences:")}</strong>
+                {prefLines.length === 0 ? (
+                  <span> {t("willing to help where needed")}</span>
+                ) : (
+                  <ul className="mt-1 list-disc pl-5 text-xs">
+                    {prefLines.map((l, i) => (
+                      <li key={i}>{l}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {error && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{t(error)}</p>}

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/i18n/language-toggle";
 import { useLang } from "@/components/i18n/language-provider";
 
@@ -21,7 +20,6 @@ export function SiteHeader() {
             {t("Admin")}
           </Link>
           <LanguageToggle />
-          <ThemeToggle />
         </nav>
       </div>
     </header>

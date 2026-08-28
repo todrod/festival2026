@@ -60,7 +60,7 @@ export const ES: Record<string, string> = {
   "1) Personal Details": "1) Datos personales",
   Name: "Nombre",
   "Last Name": "Apellido",
-  DOB: "Fecha de nacimiento",
+  "Date of Birth": "Fecha de nacimiento",
   Phone: "Teléfono",
   Email: "Correo electrónico",
   "Emergency Contact": "Contacto de emergencia",
@@ -78,6 +78,8 @@ export const ES: Record<string, string> = {
   "Years Experience": "Años de experiencia",
   "Text OK": "Acepto mensajes de texto",
   "Email OK": "Acepto correos electrónicos",
+  "OK to text me reminders": "Acepto recibir recordatorios por mensaje de texto",
+  "OK to email me updates": "Acepto recibir novedades por correo electrónico",
   "Your status:": "Su estado:",
   "— more years means higher priority when shifts are assigned.":
     "— más años significan mayor prioridad al asignar los turnos.",
@@ -165,7 +167,16 @@ export const ES: Record<string, string> = {
   "Submitting...": "Enviando...",
   "Clear Selections": "Borrar selecciones",
   "You're signed up!": "¡Está inscrito!",
+  "You're all signed up!": "¡Ya está inscrito!",
+  "Thank you for volunteering. A coordinator will review everyone's availability and confirm your specific shifts closer to the festival — nothing more to do for now.":
+    "Gracias por ser voluntario. Un coordinador revisará la disponibilidad de todos y confirmará sus turnos específicos más cerca del festival — no necesita hacer nada por ahora.",
+  "Watch for a confirmation by text or email.": "Esté atento a una confirmación por texto o correo electrónico.",
   "Confirmation ID:": "Número de confirmación:",
+  "Confirmation number:": "Número de confirmación:",
+  "Your days:": "Sus días:",
+  "none selected": "ninguno seleccionado",
+  "Job preferences:": "Preferencias de trabajo:",
+  "willing to help where needed": "dispuesto a ayudar donde se necesite",
   "Print Confirmation": "Imprimir confirmación",
 
   // --- Errors ---
