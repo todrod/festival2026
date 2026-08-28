@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validators";
 import { buildVolunteerConfirmation, sendEmail } from "@/lib/email";
+import { buildVolunteerSmsConfirmation, sendSms, toE164 } from "@/lib/sms";
 
 function isAtLeast18(dob: Date) {
   const now = new Date();
@@ -129,6 +130,19 @@ export async function POST(req: Request) {
       await sendEmail({ to: parsed.email, subject, html, text });
     } catch (emailErr) {
       console.error("confirmation email failed", emailErr);
+    }
+
+    // Best-effort confirmation text — only for volunteers who opted in to texts
+    // and gave a dialable number. Never fail the signup if SMS breaks.
+    if (parsed.textOk) {
+      try {
+        const smsTo = toE164(parsed.phone);
+        if (smsTo) {
+          await sendSms({ to: smsTo, body: buildVolunteerSmsConfirmation({ firstName: parsed.firstName }) });
+        }
+      } catch (smsErr) {
+        console.error("confirmation SMS failed", smsErr);
+      }
     }
 
     return NextResponse.json({ ok: true, volunteerId: created.id, updatedExisting: !!existing });
