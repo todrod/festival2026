@@ -203,7 +203,8 @@ export const ROLE_SEEDS: RoleSeed[] = [
   { key: "COFFEE_PERSON", name: "Coffee Person", module: RoleModule.BOOTH, description: "Coffee station + cash transactions.", requiresStanding: true, requiresCash: true, boothTarget: 2 },
   { key: "CUSTOMER_SERVICE", name: "Customer Service / Floaters", module: RoleModule.BOOTH, description: "Guest support and line help.", requiresStanding: true, requiresOutdoor: true, boothTarget: 5 },
 
-  { key: "EARLY_SETUP", name: "Early Setup", module: RoleModule.HALL, description: "Setup before opening; lifting required.", requiresHeavyLift: true, requiresStanding: true },
+  { key: "EARLY_SETUP", name: "Early Morning Booth Setup", module: RoleModule.BOOTH, description: "6-8 AM booth setup: prep tables, move ice, fill berry bowls, start whip cream. Lifting required. Scheduled by Trish (813-335-4299).", requiresHeavyLift: true, requiresStanding: true, boothTarget: 8 },
+
   { key: "BERRY_HULLERS", name: "Berry Hullers", module: RoleModule.HALL, description: "Hull berries for production flow.", requiresStanding: true },
   { key: "BERRY_PRODUCTION", name: "Berry Production", module: RoleModule.HALL, description: "Production line processing.", requiresStanding: true },
   { key: "UNIFORMS_AM", name: "Uniforms AM", module: RoleModule.HALL, description: "Morning uniforms distribution.", requiresStanding: true },

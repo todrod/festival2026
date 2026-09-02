@@ -27,6 +27,13 @@ export async function clearAdminSession() {
 }
 
 export async function isAdminAuthenticated() {
+  // Local-review bypass: when DISABLE_ADMIN_AUTH=1 is set in a NON-production
+  // environment (e.g. .env.local), every request is treated as signed in so the
+  // admin pages can be reviewed without a password. The NODE_ENV guard means
+  // this can never take effect on the deployed site, even if the flag leaks.
+  if (process.env.NODE_ENV !== "production" && process.env.DISABLE_ADMIN_AUTH === "1") {
+    return true;
+  }
   const store = await cookies();
   const raw = store.get(COOKIE_NAME)?.value;
   if (!raw) return false;

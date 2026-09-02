@@ -258,6 +258,18 @@ export function AdminDashboard() {
     void load();
   }, [load]);
 
+  // Local-review convenience: in the dev build only, skip the admin login box so
+  // the dashboard can be reviewed without a password, regardless of which host
+  // (localhost, 127.0.0.1, or a LAN IP) is used to reach the dev server. In a
+  // production build NODE_ENV is "production", so this never affects the
+  // deployed site. Pairs with the DISABLE_ADMIN_AUTH server bypass so the admin
+  // APIs also accept the request.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      setAuthed(true);
+    }
+  }, []);
+
   const allDates = useMemo(() => {
     if (!data) return [];
     const unique = new Set(data.shifts.map((s) => format(new Date(s.date), "yyyy-MM-dd")));
@@ -654,7 +666,7 @@ export function AdminDashboard() {
 
   async function assignSelectedFromInspector() {
     if (!selectedVolunteer || !selectedRole || !selectedShift) {
-      setMessage(t("Select a volunteer and role first."));
+      setMessage(t("Select a volunteer and position first."));
       return;
     }
     const res = await fetch("/api/admin/assignments", {
@@ -675,7 +687,7 @@ export function AdminDashboard() {
 
   async function loadSuggestionsForRole() {
     if (!selectedShift || !selectedRole) {
-      setMessage(t("Select a shift and role first."));
+      setMessage(t("Select a shift and position first."));
       return;
     }
     const res = await fetch("/api/admin/suggestions", {
@@ -709,7 +721,7 @@ export function AdminDashboard() {
             ? `${t("Locked")} ${payload.count ?? 0} ${t("assignments")}`
             : action === "unlock_all"
               ? `${t("Unlocked")} ${payload.count ?? 0} ${t("assignments")}`
-              : `${t("Auto-assigned unfilled roles")} (${payload.count ?? 0} ${t("total assignments now")})`;
+              : `${t("Auto-assigned unfilled positions")} (${payload.count ?? 0} ${t("total assignments now")})`;
       setMessage(msg);
     } else {
       setMessage(payload.error || t("Bulk action failed"));
@@ -747,7 +759,7 @@ export function AdminDashboard() {
     const roleId = over.replace("role:", "");
     const eligibility = roleEligibilityMap.get(`${volunteerId}:${roleId}`);
     if (!eligibility?.eligible) {
-      setMessage(`${t("Cannot assign:")} ${eligibility?.reasons.map((r) => t(r)).join(", ") || t("Ineligible for role")}`);
+      setMessage(`${t("Cannot assign:")} ${eligibility?.reasons.map((r) => t(r)).join(", ") || t("Ineligible for position")}`);
       setSelectedVolunteerId(volunteerId);
       setInspectorRoleId(roleId);
       return;
@@ -838,6 +850,23 @@ export function AdminDashboard() {
           {t("Sign In")}
         </button>
         {message && <p className="mt-2 text-sm text-red-700">{message}</p>}
+      </section>
+    );
+  }
+
+  // Authenticated (or local bypass) but no data loaded yet — usually the local
+  // database isn't connected. Show a clear message instead of a broken board.
+  if (!data) {
+    return (
+      <section className="panel max-w-md p-5">
+        <h2 className="text-xl font-bold">{t("Admin data unavailable")}</h2>
+        <p className="mt-2 text-sm text-foreground/80">
+          {t("The dashboard could not load its data. On local, this means the database is not connected yet.")}
+        </p>
+        {message && <p className="mt-2 text-sm text-red-700">{message}</p>}
+        <button onClick={() => void load()} className="mt-3 rounded-lg bg-strawberry-500 px-4 py-2 text-sm font-semibold text-white">
+          {t("Retry")}
+        </button>
       </section>
     );
   }
@@ -1221,10 +1250,10 @@ export function AdminDashboard() {
               <div className="grid gap-4 xl:grid-cols-[280px_1fr_300px]">
                 <div className="panel xl:col-span-3 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground/85">{t("Role Legend")}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground/85">{t("Position Legend")}</p>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="rounded border border-strawberry-200 bg-card px-2 py-0.5">
-                        {t("Filter:")} {selectedRoleFilterIds.length === 0 ? t("All roles") : `${selectedRoleFilterIds.length} ${t("selected")}`}
+                        {t("Filter:")} {selectedRoleFilterIds.length === 0 ? t("All positions") : `${selectedRoleFilterIds.length} ${t("selected")}`}
                       </span>
                       {selectedRoleFilterIds.length > 0 && (
                         <button
@@ -1266,8 +1295,8 @@ export function AdminDashboard() {
                 <aside className="panel no-print p-3">
                   <h3 className="font-semibold">{t("Available Pool")}</h3>
                   <p className="mb-2 text-xs text-foreground/85">
-                    {t("Drag into a green role, red roles are blocked.")}
-                    {selectedRoleFilterIds.length > 0 ? ` ${t("Pool is filtered by selected role chips.")}` : ""}
+                    {t("Drag into a green position, red positions are blocked.")}
+                    {selectedRoleFilterIds.length > 0 ? ` ${t("Pool is filtered by selected position chips.")}` : ""}
                   </p>
                   <input
                     className="mb-2 w-full rounded-md border border-strawberry-200 px-2 py-2 text-xs"
@@ -1425,7 +1454,7 @@ export function AdminDashboard() {
                       </div>
                       {selectedRole && (
                         <div className="rounded border border-leaf-300 bg-leaf-200/40 p-2">
-                          <p className="font-semibold">{t("Selected Role")}</p>
+                          <p className="font-semibold">{t("Selected Position")}</p>
                           <p>{t(selectedRole.name)}</p>
                           <p className="mt-1">{t("Requires training:")} {selectedRole.requiresTraining ? t("Yes") : t("No")}</p>
                           <p>{t("Requires approval:")} {selectedRole.requiresApproval ? t("Yes") : t("No")}</p>
@@ -1436,7 +1465,7 @@ export function AdminDashboard() {
                         <div className={`rounded border p-2 ${eligibilityReasons.length === 0 ? "border-green-300 bg-green-50 text-green-900 dark:bg-green-700/30 dark:text-green-100" : "border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-700/30 dark:text-amber-100"}`}>
                           <p className="font-semibold">{t("Eligibility Check")}</p>
                           {eligibilityReasons.length === 0 ? (
-                            <p className="text-green-700 dark:text-green-100">{t("Eligible for selected role and shift.")}</p>
+                            <p className="text-green-700 dark:text-green-100">{t("Eligible for selected position and shift.")}</p>
                           ) : (
                             <ul className="list-disc pl-4 text-amber-900 dark:text-amber-100">
                               {eligibilityReasons.map((r) => (
@@ -1648,8 +1677,8 @@ export function AdminDashboard() {
               <h2 className="text-lg font-bold">{t("Training & Approvals")}</h2>
               <p className="text-xs text-foreground/70">
                 {gatedRoles.length === 0
-                  ? t("No roles currently require training or approval.")
-                  : `${t("Roles needing sign-off:")} ${gatedRoles.map((r) => t(r.name)).join(", ")}`}
+                  ? t("No positions currently require training or approval.")
+                  : `${t("Positions needing sign-off:")} ${gatedRoles.map((r) => t(r.name)).join(", ")}`}
               </p>
             </div>
             {gatedRoles.length > 0 && (

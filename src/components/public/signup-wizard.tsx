@@ -2,7 +2,7 @@
 
 import { RoleModule, type Role, type Shift } from "@prisma/client";
 import { format } from "date-fns";
-import { AlertCircle, CakeSlice, Star } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { seniorityTier } from "@/lib/seniority";
 import { useLang } from "@/components/i18n/language-provider";
@@ -36,6 +36,19 @@ const profileFields: Array<{
   { label: "Emergency Contact Phone", key: "emergencyContactPhone" },
 ];
 
+// Positions that are scheduled by calling a coordinator directly. We still let
+// volunteers register online, but show the contact so they can call to confirm.
+// Keyed by the role's stable `key` from the seed.
+const ROLE_CONTACTS: Record<string, { name: string; phone: string }> = {
+  EARLY_SETUP: { name: "Trish", phone: "813-335-4299" },
+  BERRY_HULLERS: { name: "Ted", phone: "813-334-9578" },
+  BERRY_PRODUCTION: { name: "Tim", phone: "813-382-3455" },
+  UNIFORMS_AM: { name: "Cathy", phone: "305-216-2806" },
+  UNIFORMS_PM: { name: "Cathy", phone: "305-216-2806" },
+  HEAVY_HALL: { name: "Ted", phone: "813-334-9578" },
+  BUCKET_WASHERS: { name: "Ana", phone: "813-704-3098" },
+};
+
 function upsertPref(list: PrefItem[], role: Role) {
   if (list.some((x) => x.roleId === role.id)) {
     return list.filter((x) => x.roleId !== role.id).map((x, i) => ({ ...x, rank: i + 1 }));
@@ -61,6 +74,7 @@ export function SignupWizard({ shifts, roles }: Props) {
   const [prefMode, setPrefMode] = useState<PrefMode>("BOOTH_DAY");
   const [areaTab, setAreaTab] = useState<"BOOTH" | "HALL">("BOOTH");
   const [activeStep, setActiveStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [contactPopup, setContactPopup] = useState<{ name: string; phone: string; role: string } | null>(null);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -137,7 +151,7 @@ export function SignupWizard({ shifts, roles }: Props) {
       return;
     }
     if (activeStep === 3 && !step3Valid) {
-      setError("Please select at least one role preference or mark willing-to-do-any for a booth shift.");
+      setError("Please select at least one position preference or mark willing-to-do-any for a booth shift.");
       return;
     }
     if (activeStep === 4 && !step4Valid) {
@@ -225,7 +239,7 @@ export function SignupWizard({ shifts, roles }: Props) {
         </p>
         <p className="mt-2 text-sm text-foreground/85">{t("Watch for a confirmation by text or email.")}</p>
         <p className="mt-3 text-xs text-foreground/60">{t("Confirmation number:")} {result}</p>
-        <button onClick={() => window.print()} className="mt-4 rounded-full bg-strawberry-500 px-6 py-2 text-sm font-semibold text-[#04140b]">
+        <button onClick={() => window.print()} className="mt-4 rounded-full bg-strawberry-500 px-6 py-2 text-sm font-semibold text-white">
           {t("Print Confirmation")}
         </button>
       </section>
@@ -241,7 +255,7 @@ export function SignupWizard({ shifts, roles }: Props) {
             key={a}
             type="button"
             onClick={() => selectArea(a)}
-            className={`rounded-full px-5 py-2 text-sm font-bold ${areaTab === a ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"}`}
+            className={`rounded-full px-5 py-2 text-sm font-bold ${areaTab === a ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"}`}
           >
             {a === "BOOTH" ? t("Booth") : t("Hall")}
           </button>
@@ -252,23 +266,22 @@ export function SignupWizard({ shifts, roles }: Props) {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-3xl font-black tracking-tight text-strawberry-900">{t("Volunteer Signup")}</h1>
-      <p className="text-sm text-foreground/80">{t("Complete all steps to submit your volunteer profile, availability, and role preferences.")}</p>
+      <h1 className="text-3xl font-black tracking-tight text-strawberry-900">{t("Volunteer Sign-Up")}</h1>
+      <p className="text-sm text-foreground/80">{t("Complete all steps to submit your volunteer profile, availability, and position preferences.")}</p>
 
       <section className="space-y-5 text-foreground">
-      <div className="relative overflow-hidden rounded-3xl border border-strawberry-100 bg-card p-5">
-        <div className="absolute -right-2 -top-2 text-strawberry-500"><Star className="h-10 w-10" /></div>
+      <div className="relative overflow-hidden rounded-3xl border border-strawberry-100 bg-gradient-to-br from-strawberry-50 via-card to-leaf-200 p-5">
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-          <div className="rounded-2xl border border-strawberry-100 bg-gradient-to-br from-strawberry-50 to-muted p-3">
-            <div className="h-full min-h-40 rounded-xl border border-strawberry-100 bg-background/70 p-3 text-xs text-foreground/90">
-              <p className="font-semibold text-strawberry-900">{t("Festival Volunteer Poster")}</p>
-              <p className="mt-2">{t("Family-friendly, simple signup, role-first scheduling.")}</p>
-              <CakeSlice className="mt-4 h-8 w-8 text-strawberry-500" />
+          <div className="grid place-items-center rounded-2xl border border-strawberry-100 bg-white p-4 text-center">
+            <div>
+              <div aria-hidden className="text-5xl">🍓🍰🍓</div>
+              <p className="mt-3 text-sm font-black text-strawberry-900">{t("St. Clement “Make Your Own Strawberry Shortcake Project.”")}</p>
+              <p className="mt-1 text-xs font-semibold text-leaf-700">{t("53rd Year · March 4-14, 2027")}</p>
             </div>
           </div>
           <div>
-            <h2 className="text-3xl font-black leading-tight text-strawberry-900">{t("Volunteer for the 2027 St. Clement Strawberry Festival!")}</h2>
-            <p className="mt-2 text-lg text-foreground/85">{t("Select your role below. Simple for young & old.")}</p>
+            <h2 className="text-3xl font-black leading-tight text-strawberry-900">{t("Volunteer for St. Clement")}{" "}<span className="text-[color:var(--gold)]">{t("“Make Your Own Strawberry Shortcake Project.”")}</span></h2>
+            <p className="mt-2 text-lg text-foreground/85">{t("Pick your position below. Simple for young & old.")}</p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               {[
                 [1, "1. Personal Details"],
@@ -282,7 +295,7 @@ export function SignupWizard({ shifts, roles }: Props) {
                   type="button"
                   onClick={() => setActiveStep(step as 1 | 2 | 3 | 4 | 5)}
                   className={`rounded-full px-3 py-1.5 font-semibold ${
-                    activeStep === step ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"
+                    activeStep === step ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-strawberry-900 hover:bg-strawberry-50"
                   }`}
                 >
                   {t(label as string)}
@@ -329,8 +342,6 @@ export function SignupWizard({ shifts, roles }: Props) {
               <option value="" disabled>{t("Select…")}</option>
               <option value="FEMALE">{t("Female")}</option>
               <option value="MALE">{t("Male")}</option>
-              <option value="NON_BINARY">{t("Non-binary")}</option>
-              <option value="PREFER_NOT_TO_SAY">{t("Prefer not to say")}</option>
             </select>
           </label>
           <label className="text-sm">
@@ -367,7 +378,7 @@ export function SignupWizard({ shifts, roles }: Props) {
           <a href="/privacy" target="_blank" rel="noreferrer" className="underline">{t("Privacy Policy")}</a>
         </p>
         <div className="mt-4 flex justify-end">
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">{t("Next")}</button>
         </div>
       </div>}
 
@@ -397,37 +408,47 @@ export function SignupWizard({ shifts, roles }: Props) {
           })}
         </div>
 
-        <div className="mt-4 grid gap-2 text-xs md:grid-cols-3">
-          <div className="rounded-xl border border-strawberry-100 bg-muted p-2"><strong>{t("Orientation")}</strong><br />{t("Choose your orientation slot during signup.")}</div>
-          <div className="rounded-xl border border-strawberry-100 bg-muted p-2"><strong>{t("Dress Code")}</strong><br />{t("White shirt + white hat preferred.")}</div>
-          <div className="rounded-xl border border-strawberry-100 bg-muted p-2"><strong>{t("Physical")}</strong><br />{t("Lifting options are acknowledged below.")}</div>
-        </div>
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">{t("Back")}</button>
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">{t("Next")}</button>
         </div>
       </div>}
 
       {activeStep === 3 && <div id="jobs" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
-        <h3 className="text-xl font-black text-strawberry-900">{t("3) Job Selection")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xl font-black text-strawberry-900">{t("3) Job Selection")}</h3>
+          <a href="/positions" target="_blank" rel="noreferrer" className="text-xs font-semibold text-strawberry-500 underline">
+            {t("What does each position do?")}
+          </a>
+        </div>
         {areaToggle}
         {areaTab === "BOOTH" && (
           <div className="mt-1 flex flex-wrap gap-2">
-            <button onClick={() => setPrefMode("BOOTH_DAY")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_DAY" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Day")}</button>
-            <button onClick={() => setPrefMode("BOOTH_NIGHT")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_NIGHT" ? "bg-strawberry-500 text-[#04140b]" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Night")}</button>
+            <button onClick={() => setPrefMode("BOOTH_DAY")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_DAY" ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Day")}</button>
+            <button onClick={() => setPrefMode("BOOTH_NIGHT")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${prefMode === "BOOTH_NIGHT" ? "bg-strawberry-500 text-white" : "border border-strawberry-100 bg-background text-foreground"}`}>{t("Booth Night")}</button>
           </div>
         )}
 
         <div className="mt-3 grid gap-2 md:grid-cols-4">
           {activeRoles.map((role) => {
             const selected = activePrefs.some((x) => x.roleId === role.id);
+            const contact = ROLE_CONTACTS[role.key];
             return (
               <article key={role.id} className={`rounded-xl border p-2 ${selected ? "border-leaf-500 bg-leaf-200/40" : "border-strawberry-100 bg-background"}`}>
                 <p className="text-sm font-semibold text-strawberry-900">{t(role.name)}</p>
                 <p className="mt-1 line-clamp-3 text-[11px] text-foreground/80">{t(role.description)}</p>
-                <button onClick={() => applyRole(role)} className="mt-2 w-full rounded-lg bg-strawberry-500 px-2 py-1.5 text-xs font-semibold text-[#04140b]">
+                <button onClick={() => applyRole(role)} className="mt-2 w-full rounded-lg bg-strawberry-500 px-2 py-1.5 text-xs font-semibold text-white">
                   {selected ? t("Selected") : t("Apply")}
                 </button>
+                {contact && (
+                  <button
+                    type="button"
+                    onClick={() => setContactPopup({ ...contact, role: role.name })}
+                    className="mt-1 w-full rounded-lg border border-leaf-500 bg-leaf-200 px-2 py-1.5 text-xs font-semibold text-leaf-700"
+                  >
+                    📞 {t("How to sign up")}
+                  </button>
+                )}
               </article>
             );
           })}
@@ -436,7 +457,7 @@ export function SignupWizard({ shifts, roles }: Props) {
         <div className="mt-4 rounded-xl border border-strawberry-100 bg-background p-3">
           <p className="text-sm font-semibold text-strawberry-900">{t("Selected preferences")}</p>
           {activePrefs.length === 0 ? (
-            <p className="text-xs text-foreground/75">{t("No roles selected yet.")}</p>
+            <p className="text-xs text-foreground/75">{t("No positions selected yet.")}</p>
           ) : (
             <ul className="mt-2 space-y-1 text-sm">
               {activePrefs.map((pref, idx) => (
@@ -454,7 +475,7 @@ export function SignupWizard({ shifts, roles }: Props) {
         </div>
         {areaTab === "BOOTH" && (
           <div className="mt-4 rounded-xl border border-strawberry-100 bg-background p-3 text-sm">
-            <p className="font-semibold text-strawberry-900">{t("Willing to do any role if needed")}</p>
+            <p className="font-semibold text-strawberry-900">{t("Willing to do any position if needed")}</p>
             <div className="mt-2 flex flex-wrap gap-4">
               <label className="inline-flex items-center gap-2">
                 <input
@@ -477,13 +498,13 @@ export function SignupWizard({ shifts, roles }: Props) {
         )}
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">{t("Back")}</button>
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">{t("Next")}</button>
         </div>
       </div>}
 
       {activeStep === 4 && <div id="acknowledgements" className="panel rounded-2xl border border-strawberry-100 p-4 shadow-sm">
         <h3 className="text-xl font-black text-strawberry-900">{t("4) Acknowledgements")}</h3>
-        <p className="text-sm text-foreground/85">{t("Confirm the required acknowledgements below. The optional ones expand which roles you can be assigned to.")}</p>
+        <p className="text-sm text-foreground/85">{t("Confirm the required acknowledgements below. The optional ones expand which positions you can be assigned to.")}</p>
         <div className="mt-4 space-y-2 text-sm">
           <p className="rounded-md border border-strawberry-100 bg-muted p-3 text-foreground">
             <AlertCircle className="mr-2 inline h-4 w-4 text-strawberry-300" />
@@ -491,7 +512,7 @@ export function SignupWizard({ shifts, roles }: Props) {
           </p>
           {[
             ["I confirm I am at least 18 years old", "age18Plus"],
-            ["I can stand/walk for booth roles", "standingWalking"],
+            ["I can stand/walk for booth positions", "standingWalking"],
             ["I can perform heavy lifting up to 50 lbs if assigned", "heavyLift50"],
             ["I am comfortable handling cash if assigned", "cashHandling"],
             ["I can work outdoors/sun if assigned", "outdoorSun"],
@@ -512,7 +533,7 @@ export function SignupWizard({ shifts, roles }: Props) {
         </div>
         <div className="mt-4 flex justify-between">
           <button type="button" onClick={prevStep} className="rounded-full border border-strawberry-100 bg-background px-6 py-2 text-sm font-semibold">{t("Back")}</button>
-          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b]">{t("Next")}</button>
+          <button type="button" onClick={nextStep} className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white">{t("Next")}</button>
         </div>
       </div>}
 
@@ -575,7 +596,7 @@ export function SignupWizard({ shifts, roles }: Props) {
             type="button"
             onClick={submit}
             disabled={submitting || !requiredAcknowledgementsComplete}
-            className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-[#04140b] disabled:opacity-60"
+            className="rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white disabled:opacity-60"
           >
             {submitting ? t("Submitting...") : t("Sign Up")}
           </button>
@@ -598,6 +619,39 @@ export function SignupWizard({ shifts, roles }: Props) {
         <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{t(error)}</p>
       )}
       </section>
+
+      {contactPopup && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+          onClick={() => setContactPopup(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-strawberry-100 bg-white p-6 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div aria-hidden className="text-4xl">📞</div>
+            <h4 className="mt-2 text-lg font-black text-strawberry-900">{t(contactPopup.role)}</h4>
+            <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+              {t("This position is scheduled by its coordinator.")}<br />
+              {t("Call")} <strong>{contactPopup.name}</strong> {t("at")}{" "}
+              <a
+                href={`tel:${contactPopup.phone.replace(/[^0-9]/g, "")}`}
+                className="font-bold text-strawberry-500 underline"
+              >
+                {contactPopup.phone}
+              </a>{" "}
+              {t("to schedule.")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setContactPopup(null)}
+              className="mt-4 rounded-full bg-strawberry-500 px-6 py-2 text-sm font-bold text-white"
+            >
+              {t("Close")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

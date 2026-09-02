@@ -3,55 +3,95 @@
 import Link from "next/link";
 import { useLang } from "@/components/i18n/language-provider";
 
-const faqs: Array<[string, string]> = [
-  ["Who can volunteer?", "Volunteers must be 18+ and complete acknowledgements before scheduling."],
-  ["Can I work more than one role?", "Yes. You can take multiple roles as long as time windows do not overlap."],
-  ["Can I do booth day and booth night on same date?", "No. Booth day and night cannot both be assigned for the same date."],
-  ["Are heavy roles optional?", "Yes. Heavy-lift acknowledgement is only required for flagged heavy roles and Relief."],
-  ["Do some roles require approval?", "Supervisor requires both training and explicit admin approval."],
+// Booth and hall rules in statement form — these replace the old FAQ per the
+// parish change sheet. Wording follows the 2027 paper sign-up sheet.
+const boothRules: string[] = [
+  "Volunteers must be 16 or older. Workers 16, 17, or 18 who are in high school or still living at home must work alongside a parent.",
+  "Wear a white button-down shirt or blouse with a collar (white shirts are available if you need one).",
+  "Men wear dark long pants. Ladies wear pants, shorts, or leggings — a skirt, apron, hat, and doily head covering are provided.",
+  "Wear comfortable shoes. A lot of standing is required, and there is no sitting in food serving or prep areas.",
+  "Smiling is required! Breaks are provided.",
+  "Transportation to and from the festival grounds is provided by church bus.",
 ];
+
+const hallRules: string[] = [
+  "Hall work runs March 3 through March 14. Lunch is provided for all hall workers.",
+  "A free dinner is provided for nighttime bucket washers.",
+  "You sign up for each hall position by calling the coordinator listed for that job.",
+  "Bring your own knife if you are hulling berries.",
+  "Shift times vary by job — for example, berry hulling starts at 7:30 AM.",
+];
+
+function BerryFriends() {
+  // Simple, cheerful "berry people" made from emoji so the page feels like the
+  // bulletin ads without needing image assets. Decorative only.
+  return (
+    <div aria-hidden className="pointer-events-none flex select-none items-end justify-center gap-1 text-4xl">
+      <span className="translate-y-1">🍓</span>
+      <span className="text-5xl">🍓</span>
+      <span className="translate-y-1">🍰</span>
+      <span className="text-5xl">🍓</span>
+      <span className="translate-y-1">🍓</span>
+    </div>
+  );
+}
 
 export function LandingContent({ datesLabel }: { datesLabel: string }) {
   const { t } = useLang();
   return (
     <div className="space-y-8">
-      <section className="panel ops-surface overflow-hidden">
-        <div className="grid gap-8 bg-gradient-to-br from-strawberry-50 via-card to-leaf-200/40 p-8 md:grid-cols-2">
+      <section className="panel overflow-hidden border-strawberry-100">
+        <div className="grid gap-8 bg-gradient-to-br from-strawberry-50 via-card to-leaf-200 p-8 md:grid-cols-2">
           <div>
-            <p className="ops-chip mb-2 inline-block rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide text-strawberry-900">
-              {t("Volunteer Signup Open")}
+            <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-leaf-500 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+              🍓 {t("Volunteer Sign-Up Open")} · {t("53rd Year")}
             </p>
-            <h1 className="text-4xl font-black tracking-tight text-strawberry-900">
-              {t("Volunteer for St. Clement Strawberry Festival")}
+            <h1 className="text-4xl font-black leading-tight tracking-tight text-strawberry-900">
+              {t("Volunteer for St. Clement")}{" "}
+              <span className="text-[color:var(--gold)]">
+                {t("“Make Your Own Strawberry Shortcake Project.”")}
+              </span>
             </h1>
-            <p className="mt-3 max-w-xl text-base leading-relaxed text-foreground/85">
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-foreground/85">
               {t(
-                "Digital volunteer scheduling for booth and hall operations. Choose your days, rank role preferences, and get assigned with fair rules and seniority tie-breaks.",
+                "Join the parish for our 53rd Strawberry Festival! Choose the days you can help, pick the positions you'd like, and we'll take care of the schedule.",
               )}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/signup" className="ops-btn ops-btn-primary px-5 py-3 text-sm shadow-sm">
-                {t("Start Volunteer Signup")}
+              <Link href="/signup" className="ops-btn ops-btn-primary px-6 py-3 text-sm shadow-sm">
+                {t("Start Volunteer Sign-Up")}
+              </Link>
+              <Link href="/positions" className="ops-btn ops-btn-ghost px-5 py-3 text-sm">
+                {t("Position Descriptions")}
               </Link>
               <Link href="/admin" className="ops-btn ops-btn-ghost px-5 py-3 text-sm">
                 {t("Admin Dashboard")}
               </Link>
             </div>
+            <div className="mt-6">
+              <BerryFriends />
+            </div>
           </div>
-          <div className="ops-surface rounded-2xl p-5">
-            <h2 className="text-lg font-bold">{t("Festival Snapshot")}</h2>
+          <div className="rounded-2xl border border-strawberry-100 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-black text-strawberry-900">🎪 {t("Festival Snapshot")}</h2>
             <ul className="mt-3 space-y-2 text-sm">
               <li>
-                <span className="font-semibold">{t("Dates:")}</span> {datesLabel}
+                <span className="font-semibold text-strawberry-900">{t("Booth Dates:")}</span> {datesLabel}
               </li>
               <li>
-                <span className="font-semibold">{t("Modules:")}</span> {t("BOOTH + HALL with shared volunteer pool")}
+                <span className="font-semibold text-strawberry-900">{t("Hall Dates:")}</span> {t("Mar 3 - Mar 14, 2027")}
               </li>
               <li>
-                <span className="font-semibold">{t("Shift policy:")}</span> {t("no overlapping windows")}
+                <span className="font-semibold text-strawberry-900">{t("Orientation:")}</span>{" "}
+                {t("Sun, Jan 31, 2027 · 5:00-7:00 PM · Cronin Hall")}
               </li>
               <li>
-                <span className="font-semibold">{t("Safety:")}</span> {t("18+ only, role capability checks enforced")}
+                <span className="font-semibold text-strawberry-900">{t("Two areas:")}</span>{" "}
+                {t("Booth (festival grounds) and Hall (berry prep)")}
+              </li>
+              <li>
+                <span className="font-semibold text-strawberry-900">{t("Bus:")}</span>{" "}
+                {t("Transportation provided to and from the grounds")}
               </li>
             </ul>
           </div>
@@ -59,12 +99,34 @@ export function LandingContent({ datesLabel }: { datesLabel: string }) {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        {faqs.map(([q, a]) => (
-          <details key={q} className="panel ops-surface p-4">
-            <summary className="cursor-pointer text-base font-semibold">{t(q)}</summary>
-            <p className="mt-2 text-sm text-foreground/80">{t(a)}</p>
-          </details>
-        ))}
+        <div className="panel border-strawberry-100 p-5">
+          <h2 className="flex items-center gap-2 text-xl font-black text-strawberry-900">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-strawberry-500 text-white">🍓</span>
+            {t("Booth Worker Rules")}
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm leading-relaxed text-foreground/90">
+            {boothRules.map((rule) => (
+              <li key={rule} className="flex gap-2">
+                <span className="mt-0.5 text-leaf-500">✔</span>
+                <span>{t(rule)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="panel border-strawberry-100 p-5">
+          <h2 className="flex items-center gap-2 text-xl font-black text-strawberry-900">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-leaf-500 text-white">🥣</span>
+            {t("Hall Worker Rules")}
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm leading-relaxed text-foreground/90">
+            {hallRules.map((rule) => (
+              <li key={rule} className="flex gap-2">
+                <span className="mt-0.5 text-leaf-500">✔</span>
+                <span>{t(rule)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
     </div>
   );

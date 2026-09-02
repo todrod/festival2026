@@ -478,4 +478,94 @@ export const ES: Record<string, string> = {
   "Pick your days below. You can switch area to add shifts from the other area too.":
     "Elija sus días abajo. Puede cambiar de área para agregar turnos de la otra área también.",
   Area: "Área",
+
+  // --- 2027 sign-up overhaul: landing ---
+  "Volunteer Sign-Up Open": "Inscripción de voluntarios abierta",
+  "53rd Year": "53.º Año",
+  "Volunteer for St. Clement": "Sea voluntario de St. Clement",
+  "“Make Your Own Strawberry Shortcake Project.”": "«Proyecto Haz Tu Propio Pastel de Fresa».",
+  "Join the parish for our 53rd Strawberry Festival! Choose the days you can help, pick the positions you'd like, and we'll take care of the schedule.":
+    "¡Únase a la parroquia en nuestro 53.º Festival de la Fresa! Elija los días en que puede ayudar, escoja las posiciones que prefiera y nosotros nos encargamos del horario.",
+  "Start Volunteer Sign-Up": "Comenzar inscripción",
+  "Position Descriptions": "Descripciones de posiciones",
+  "Booth Dates:": "Fechas del puesto:",
+  "Hall Dates:": "Fechas del salón:",
+  "Mar 3 - Mar 14, 2027": "3 mar - 14 mar, 2027",
+  "Orientation:": "Orientación:",
+  "Sun, Jan 31, 2027 · 5:00-7:00 PM · Cronin Hall": "Dom, 31 ene, 2027 · 5:00-7:00 PM · Cronin Hall",
+  "Two areas:": "Dos áreas:",
+  "Booth (festival grounds) and Hall (berry prep)": "Puesto (terreno del festival) y Salón (preparación de fresas)",
+  "Bus:": "Autobús:",
+  "Transportation provided to and from the grounds": "Transporte proporcionado hacia y desde el terreno",
+  "Booth Worker Rules": "Reglas del trabajador del puesto",
+  "Hall Worker Rules": "Reglas del trabajador del salón",
+  "Volunteers must be 16 or older. Workers 16, 17, or 18 who are in high school or still living at home must work alongside a parent.":
+    "Los voluntarios deben tener 16 años o más. Los trabajadores de 16, 17 o 18 años que estén en la escuela secundaria o vivan en casa deben trabajar junto a un padre o madre.",
+  "Wear a white button-down shirt or blouse with a collar (white shirts are available if you need one).":
+    "Use una camisa o blusa blanca con cuello y botones (hay camisas blancas disponibles si necesita una).",
+  "Men wear dark long pants. Ladies wear pants, shorts, or leggings — a skirt, apron, hat, and doily head covering are provided.":
+    "Los hombres usan pantalón largo oscuro. Las damas usan pantalón, shorts o leggings; se proporcionan falda, delantal, gorro y cubrecabezas de encaje.",
+  "Wear comfortable shoes. A lot of standing is required, and there is no sitting in food serving or prep areas.":
+    "Use zapatos cómodos. Se requiere estar de pie mucho tiempo y no se permite sentarse en las áreas de servicio o preparación de alimentos.",
+  "Smiling is required! Breaks are provided.": "¡Sonreír es obligatorio! Se proporcionan descansos.",
+  "Transportation to and from the festival grounds is provided by church bus.":
+    "El transporte hacia y desde el terreno del festival se proporciona en autobús de la iglesia.",
+  "Hall work runs March 3 through March 14. Lunch is provided for all hall workers.":
+    "El trabajo del salón es del 3 al 14 de marzo. Se proporciona almuerzo a todos los trabajadores del salón.",
+  "A free dinner is provided for nighttime bucket washers.":
+    "Se proporciona una cena gratis a los lavadores de cubetas nocturnos.",
+  "You sign up for each hall position by calling the coordinator listed for that job.":
+    "Para cada posición del salón, inscríbase llamando al coordinador indicado para ese trabajo.",
+  "Bring your own knife if you are hulling berries.": "Traiga su propio cuchillo si va a limpiar fresas.",
+  "Shift times vary by job — for example, berry hulling starts at 7:30 AM.":
+    "Los horarios varían según el trabajo; por ejemplo, la limpieza de fresas comienza a las 7:30 AM.",
+
+  // --- 2027 sign-up overhaul: wizard ---
+  "Volunteer Sign-Up": "Inscripción de voluntarios",
+  "Complete all steps to submit your volunteer profile, availability, and position preferences.":
+    "Complete todos los pasos para enviar su perfil de voluntario, disponibilidad y preferencias de posición.",
+  "St. Clement “Make Your Own Strawberry Shortcake Project.”": "St. Clement «Proyecto Haz Tu Propio Pastel de Fresa».",
+  "53rd Year · March 4-14, 2027": "53.º Año · 4-14 de marzo, 2027",
+  "Pick your position below. Simple for young & old.": "Elija su posición abajo. Fácil para jóvenes y mayores.",
+  "What does each position do?": "¿Qué hace cada posición?",
+  "No positions selected yet.": "Aún no hay posiciones seleccionadas.",
+  "Please select at least one position preference or mark willing-to-do-any for a booth shift.":
+    "Seleccione al menos una preferencia de posición o marque «dispuesto a cualquiera» para un turno de puesto.",
+  "Willing to do any position if needed": "Dispuesto a cualquier posición si es necesario",
+  "Confirm the required acknowledgements below. The optional ones expand which positions you can be assigned to.":
+    "Confirme los reconocimientos requeridos abajo. Los opcionales amplían las posiciones a las que puede ser asignado.",
+  "I can stand/walk for booth positions": "Puedo estar de pie/caminar para posiciones del puesto",
+  "How to sign up": "Cómo inscribirse",
+  "This position is scheduled by its coordinator.": "Esta posición la programa su coordinador.",
+  Call: "Llame a",
+  at: "al",
+  "to schedule.": "para programar.",
+  Close: "Cerrar",
+
+  // --- 2027 sign-up overhaul: position descriptions ---
+  "Job Positions Descriptions": "Descripciones de las posiciones",
+  "What each position does": "Qué hace cada posición",
+  "Here is what is expected of each position so you know what you are signing up for. Descriptions are from the parish sign-up sheet.":
+    "Esto es lo que se espera de cada posición para que sepa a qué se inscribe. Las descripciones provienen de la hoja de inscripción de la parroquia.",
+  "Go to Volunteer Sign-Up": "Ir a la inscripción de voluntarios",
+  "Booth Positions": "Posiciones del puesto",
+  "Hall Positions": "Posiciones del salón",
+
+  // --- 2027 sign-up overhaul: admin (role -> position) ---
+  "Position Legend": "Leyenda de posiciones",
+  "All positions": "Todas las posiciones",
+  "Selected Position": "Posición seleccionada",
+  "Eligible for selected position and shift.": "Elegible para la posición y el turno seleccionados.",
+  "No positions currently require training or approval.": "Ninguna posición requiere capacitación o aprobación actualmente.",
+  "Positions needing sign-off:": "Posiciones que necesitan aprobación:",
+  "Auto-assigned unfilled positions": "Posiciones vacías asignadas automáticamente",
+  "Ineligible for position": "No elegible para la posición",
+  "Drag into a green position, red positions are blocked.": "Arrastre a una posición verde; las posiciones rojas están bloqueadas.",
+  "Pool is filtered by selected position chips.": "El grupo está filtrado por las posiciones seleccionadas.",
+  "Select a volunteer and position first.": "Seleccione primero un voluntario y una posición.",
+  "Select a shift and position first.": "Seleccione primero un turno y una posición.",
+  "Admin data unavailable": "Datos de administración no disponibles",
+  "The dashboard could not load its data. On local, this means the database is not connected yet.":
+    "El panel no pudo cargar sus datos. En local, esto significa que la base de datos aún no está conectada.",
+  Retry: "Reintentar",
 };

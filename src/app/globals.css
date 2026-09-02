@@ -1,19 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #152238;
-  --foreground: #f8fafc;
-  --card: #1b2b45;
-  --muted: #253654;
-  --strawberry-50: #22417a;
-  --strawberry-100: #355b9a;
-  --strawberry-300: #93c5fd;
-  --strawberry-500: #22c55e;
-  --strawberry-700: #38bdf8;
-  --strawberry-900: #f8fafc;
-  --leaf-200: #1f2937;
-  --leaf-500: #22c55e;
-  --leaf-700: #86efac;
+  /* Warm, bulletin-style palette for the volunteer-facing pages: cream
+     background with berry-red and leaf-green accents plus a gold highlight.
+     Admin keeps its own dark theme via .admin-theme below. */
+  --background: #fff8f0;
+  --foreground: #3a241a;
+  --card: #ffffff;
+  --muted: #fdeede;
+  --strawberry-50: #fdeaea;
+  --strawberry-100: #f2ccc4;
+  --strawberry-300: #d1234a;
+  --strawberry-500: #d1234a;
+  --strawberry-700: #9c1636;
+  --strawberry-900: #8a1230;
+  --leaf-200: #e6f6ec;
+  --leaf-500: #1fa751;
+  --leaf-700: #15803d;
+  --gold: #f2a900;
 }
 
 .dark {
@@ -47,6 +51,7 @@
   --color-leaf-200: var(--leaf-200);
   --color-leaf-500: var(--leaf-500);
   --color-leaf-700: var(--leaf-700);
+  --color-gold: var(--gold);
 
   --font-sans: "Avenir Next", "Avenir", "Segoe UI", sans-serif;
 }
@@ -62,7 +67,10 @@ body {
 }
 
 body {
-  background: radial-gradient(circle at top right, #355b9a 0%, var(--background) 48%);
+  background:
+    radial-gradient(circle at 12% -5%, #ffe0a3 0%, transparent 42%),
+    radial-gradient(circle at 92% 0%, #ffd0cf 0%, transparent 45%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
@@ -97,6 +105,7 @@ select optgroup {
   --leaf-200: #1f2937;
   --leaf-500: #22c55e;
   --leaf-700: #86efac;
+  --gold: #f2a900;
   color: var(--foreground);
 }
 
@@ -146,6 +155,11 @@ select optgroup {
 
 .ops-btn-primary {
   background: var(--strawberry-500);
+  color: #ffffff;
+}
+
+/* Admin uses a bright-green primary, which reads better with dark text. */
+.admin-theme .ops-btn-primary {
   color: #04140b;
 }
 
