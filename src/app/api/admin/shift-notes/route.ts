@@ -1,38 +1,29 @@
 import { NextResponse } from "next/server";
 import { getStaffSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { adminNoteSchema } from "@/lib/validators";
+import { shiftNoteSchema } from "@/lib/validators";
 import { logAdminAction } from "@/lib/audit";
 
-// Categorized admin notes on a volunteer. Restricted: schedulers and up can
-// read shared notes; a private note is only visible to its author.
+// Scheduler shift notes — visible to supervisors and admins.
 export async function POST(req: Request) {
   const session = await getStaffSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const parsed = adminNoteSchema.parse(await req.json());
-    const text = parsed.text.trim();
-    if (!text) return NextResponse.json({ error: "Note text required" }, { status: 400 });
-    const note = await prisma.adminNote.create({
-      data: {
-        volunteerId: parsed.volunteerId,
-        category: parsed.category,
-        text,
-        author: session.name,
-        isPrivate: parsed.isPrivate,
-      },
+    const parsed = shiftNoteSchema.parse(await req.json());
+    const note = await prisma.shiftNote.create({
+      data: { shiftId: parsed.shiftId, text: parsed.text.trim(), author: session.name },
     });
     await logAdminAction({
       actor: session.name,
-      action: "note_create",
-      entityType: "AdminNote",
+      action: "shift_note_create",
+      entityType: "ShiftNote",
       entityId: note.id,
-      details: parsed.category,
+      shiftId: parsed.shiftId,
     });
     return NextResponse.json({ ok: true, note });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "Failed to save note" }, { status: 400 });
+    return NextResponse.json({ error: "Failed to save shift note" }, { status: 400 });
   }
 }
 
@@ -42,13 +33,11 @@ export async function DELETE(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-  const note = await prisma.adminNote.findUnique({ where: { id } });
+  const note = await prisma.shiftNote.findUnique({ where: { id } });
   if (!note) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  // Only the author or an admin can delete a note.
   if (note.author !== session.name && session.role !== "ADMIN") {
     return NextResponse.json({ error: "Only the author or an admin can delete this note" }, { status: 403 });
   }
-  await prisma.adminNote.delete({ where: { id } });
-  await logAdminAction({ actor: session.name, action: "note_delete", entityType: "AdminNote", entityId: id });
+  await prisma.shiftNote.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

@@ -4,8 +4,9 @@ import { LanguageProvider } from "@/components/i18n/language-provider";
 import { SiteHeader } from "@/components/ui/site-header";
 
 export const metadata: Metadata = {
-  title: "St. Clement Strawberry Festival Scheduler",
-  description: "Volunteer signup and scheduling for the St. Clement Strawberry Festival",
+  title: "St. Clement Strawberry Shortcake Project — Volunteers",
+  description:
+    "Volunteer sign-up and scheduling for the St. Clement 'Make Your Own' Strawberry Shortcake Project (March 4–14, 2027)",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

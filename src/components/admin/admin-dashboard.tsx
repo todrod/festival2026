@@ -1,89 +1,103 @@
 "use client";
 
-import type { Role, Volunteer } from "@prisma/client";
+import type { AdminNote, Role, VolunteerFlag } from "@prisma/client";
 import { DndContext, type DragEndEvent, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
-import { addDays, format } from "date-fns";
+import { addDays, differenceInYears, format } from "date-fns";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AdminDataResponse } from "@/types/app";
+import type { AdminDataResponse, AutoAssignWarningPayload, VolunteerWithAck } from "@/types/app";
 import { seniorityTier } from "@/lib/seniority";
 import { isUnexcusedAbsence } from "@/lib/absence";
 import { useLang } from "@/components/i18n/language-provider";
+import { CommsTab } from "@/components/admin/comms-tab";
+import { AnalyticsTab } from "@/components/admin/analytics-tab";
+import { HallLogTab } from "@/components/admin/hall-log-tab";
+import { SupervisorTab } from "@/components/admin/supervisor-tab";
 
-type Tab = "coverage" | "schedule" | "training" | "volunteers";
-type ModuleFilter = "ALL" | "BOOTH" | "HALL";
+type Tab = "coverage" | "schedule" | "volunteers" | "training" | "supervisor" | "hall" | "analytics" | "comms";
 type ShiftFilter = "ALL" | string;
 
-function formatShiftTypeLabel(value: string) {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+const AGE_REFERENCE = new Date("2027-03-04T12:00:00Z");
+
+const NOTE_CATEGORIES = [
+  "EXCELLENT",
+  "NEEDS_GUIDANCE",
+  "CALLOUT_HISTORY",
+  "PHYSICAL_LIMITATION",
+  "LANGUAGE_ONLY_SPANISH",
+  "VIP_RETURN",
+  "DO_NOT_SCHEDULE",
+  "GENERAL",
+] as const;
+
+function noteCategoryTone(category: string) {
+  if (category === "EXCELLENT" || category === "VIP_RETURN") return "bg-leaf-200 text-leaf-700";
+  if (category === "DO_NOT_SCHEDULE") return "bg-strawberry-500 text-white";
+  if (category === "CALLOUT_HISTORY" || category === "NEEDS_GUIDANCE") return "bg-amber-200 text-amber-950";
+  return "bg-muted text-foreground";
 }
 
-function shiftSortWeight(shiftType: string) {
-  const order = [
-    "BOOTH_DAY",
-    "BOOTH_NIGHT",
-    "HALL_EARLY_SETUP",
-    "HALL_BERRY_HULLERS",
-    "HALL_BERRY_PRODUCTION",
-    "HALL_UNIFORMS_AM",
-    "HALL_HEAVY_HALL",
-    "HALL_UNIFORMS_PM",
-    "HALL_BUCKET_WASHERS",
-    "HALL_DRIVERS",
-  ];
-  const idx = order.indexOf(shiftType);
-  return idx === -1 ? 999 : idx;
+function volunteerAge(v: { dob: Date | string }) {
+  return differenceInYears(AGE_REFERENCE, new Date(v.dob));
+}
+
+// Hard blocks stop a placement (drag is refused without Force assign).
+function hardReasonsFor(volunteer: VolunteerWithAck, role: Role): string[] {
+  const reasons: string[] = [];
+  if (role.requiredGender && volunteer.gender !== role.requiredGender) {
+    reasons.push(role.requiredGender === "FEMALE" ? "Female-restricted position" : "Male-restricted position");
+  }
+  const age = volunteerAge(volunteer);
+  if (role.minAge > 0 && age < role.minAge) reasons.push(`Under minimum age ${role.minAge}`);
+  return reasons;
+}
+
+// Soft flags never block — they show as warnings the scheduler can confirm.
+function softWarningsFor(volunteer: VolunteerWithAck, role: Role): string[] {
+  const warnings: string[] = [];
+  const ack = volunteer.acknowledgement;
+  const age = volunteerAge(volunteer);
+  if (age >= 16 && age < 18 && !volunteer.parentConsent) warnings.push("Age 16–17, no parent consent");
+  if (role.liftLimitLbs > 0 && (ack?.liftingCapacityLbs ?? 0) < role.liftLimitLbs) {
+    warnings.push(`Lifting declaration (${ack?.liftingCapacityLbs ?? 0} lbs) below ${role.liftLimitLbs} lbs`);
+  }
+  if (role.requiresStanding && !ack?.standingWalking) warnings.push("No extended-standing declaration");
+  return warnings;
+}
+
+function shiftShortLabel(shiftType: string) {
+  if (shiftType === "BOOTH_SETUP") return "Early Setup";
+  if (shiftType === "BOOTH_DAY") return "Day";
+  if (shiftType === "BOOTH_NIGHT") return "Night";
+  if (shiftType === "BOOTH_PACKUP") return "Pack-Up";
+  return shiftType;
 }
 
 function shiftToneClasses(shiftType: string) {
-  const base = "bg-slate-950 text-white border";
-  if (shiftType === "BOOTH_DAY") return `${base} border-amber-400/80`;
-  if (shiftType === "BOOTH_NIGHT") return `${base} border-fuchsia-400/80`;
-  if (shiftType === "HALL_EARLY_SETUP") return `${base} border-sky-400/80`;
-  if (shiftType.includes("UNIFORMS")) return `${base} border-indigo-400/80`;
-  if (shiftType.includes("BERRY")) return `${base} border-pink-400/80`;
-  if (shiftType === "HALL_HEAVY_HALL") return `${base} border-orange-400/80`;
-  if (shiftType === "HALL_BUCKET_WASHERS") return `${base} border-teal-400/80`;
-  return `${base} border-strawberry-300/80`;
-}
-
-function shiftDescription(shiftType: string) {
-  const map: Record<string, string> = {
-    BOOTH_DAY: "Main daytime booth service window.",
-    BOOTH_NIGHT: "Evening booth operations and closeout.",
-    HALL_EARLY_SETUP: "Early setup before service starts.",
-    HALL_BERRY_HULLERS: "Berry hulling prep line until complete.",
-    HALL_BERRY_PRODUCTION: "Berry production workflow until complete.",
-    HALL_UNIFORMS_AM: "Morning uniform issue and tracking.",
-    HALL_UNIFORMS_PM: "Afternoon/evening uniform support.",
-    HALL_HEAVY_HALL: "Heavy-lift hall support shift.",
-    HALL_BUCKET_WASHERS: "Night bucket wash and reset.",
-    HALL_DRIVERS: "Manual assignment only (times TBD).",
-  };
-  return map[shiftType] || "Festival shift block.";
+  if (shiftType === "BOOTH_SETUP") return "border-sunny-400 bg-sunny-100";
+  if (shiftType === "BOOTH_DAY") return "border-strawberry-300 bg-strawberry-50";
+  if (shiftType === "BOOTH_NIGHT") return "border-leaf-500 bg-leaf-200/50";
+  return "border-strawberry-100 bg-muted";
 }
 
 function PoolCard({
   volunteer,
   selected,
-  volunteerCode,
   fitSummary,
   reliability,
+  flagCount,
 }: {
-  volunteer: Volunteer;
+  volunteer: VolunteerWithAck;
   selected: boolean;
-  volunteerCode: string;
   fitSummary: string;
   reliability: ReturnType<typeof reliabilityInfo>;
+  flagCount: number;
 }) {
   const { t } = useLang();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `pool:${volunteer.id}`,
   });
+  const tier = seniorityTier(volunteer.yearsExperience);
 
   return (
     <button
@@ -92,38 +106,28 @@ function PoolCard({
       style={{ transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined }}
       {...attributes}
       {...listeners}
-      className={`w-full cursor-grab rounded-md border px-2 py-2 text-left text-xs ${isDragging ? "opacity-50" : ""} ${selected ? "border-leaf-500 bg-leaf-200/60 text-foreground dark:bg-leaf-700/40" : "border-strawberry-200 bg-card text-foreground"}`}
+      className={`w-full cursor-grab rounded-md border px-2 py-2 text-left text-xs ${isDragging ? "opacity-50" : ""} ${selected ? "border-leaf-500 bg-leaf-200/60" : "border-strawberry-100 bg-card"}`}
     >
-      <div className="font-semibold">
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-mono text-[11px] font-black text-strawberry-700">{volunteer.volunteerCode ?? volunteer.id.slice(-6)}</span>
+        {flagCount > 0 && (
+          <span className="rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-950" title={t("Has sign-up flags")}>
+            ⚑ {flagCount}
+          </span>
+        )}
+      </div>
+      <div className="mt-0.5 text-[11px] font-semibold text-foreground/80">
         {volunteer.firstName} {volunteer.lastName}
       </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2">
-        <span className="text-xs text-foreground/85">{volunteer.phone}</span>
-        {(() => {
-          const tier = seniorityTier(volunteer.yearsExperience);
-          return (
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tier.className}`} title={`${t(tier.blurb)} (${volunteer.yearsExperience} ${t("yr")})`}>
-              <span aria-hidden>{tier.emoji}</span> {t(tier.label)}
-            </span>
-          );
-        })()}
-      </div>
-      <div className="mt-0.5">
-        <span
-          className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${reliability.className}`}
-          title={reliability.assigned > 0 ? `${reliability.attended} ${t("checked in")} · ${reliability.noShows} ${t("no-show")}` : t("No shifts yet")}
-        >
+      <div className="mt-1 flex items-center justify-between gap-1">
+        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tier.className}`} title={`${t("Legacy score")}: ${volunteer.yearsExperience}`}>
+          <span aria-hidden>{tier.emoji}</span> {volunteer.yearsExperience}
+        </span>
+        <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${reliability.className}`}>
           <span aria-hidden>{reliability.emoji}</span> {t(reliability.label)}
         </span>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="rounded bg-strawberry-100 px-1.5 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/35">
-          {volunteerCode}
-        </span>
-        <span className="truncate text-xs text-foreground/85" title={fitSummary}>
-          {fitSummary}
-        </span>
-      </div>
+      <div className="mt-1 truncate text-[10px] text-foreground/70" title={fitSummary}>{fitSummary}</div>
     </button>
   );
 }
@@ -142,7 +146,7 @@ function reliabilityInfo(stats?: ReliabilityStats) {
 }
 
 function roleHealth(count: number, target: number) {
-  if (target <= 0) return { label: "No target", className: "bg-white text-slate-900 border border-slate-300" };
+  if (target <= 0) return { label: "No target", className: "bg-card text-foreground border border-strawberry-100" };
   if (count < target) return { label: "Under", className: "bg-amber-200 text-amber-950 border border-amber-300" };
   if (count === target) return { label: "Full", className: "bg-emerald-200 text-emerald-950 border border-emerald-300" };
   return { label: "Over", className: "bg-rose-200 text-rose-950 border border-rose-300" };
@@ -154,7 +158,6 @@ function RoleColumn({
   target,
   selected,
   onSelect,
-  roleCode,
   dropState,
   children,
 }: {
@@ -163,7 +166,6 @@ function RoleColumn({
   target: number;
   selected: boolean;
   onSelect: () => void;
-  roleCode: string;
   dropState: "idle" | "eligible" | "ineligible";
   children: React.ReactNode;
 }) {
@@ -175,26 +177,163 @@ function RoleColumn({
       ref={setNodeRef}
       className={`mb-1.5 break-inside-avoid rounded-lg border p-2 ${
         dropState === "eligible"
-          ? "border-green-500 bg-green-100/50 dark:bg-green-900/20"
+          ? "border-green-500 bg-green-100/50"
           : dropState === "ineligible"
-            ? "border-red-500 bg-red-100/40 dark:bg-red-900/20"
+            ? "border-red-500 bg-red-100/40"
             : isOver
               ? "border-leaf-500 bg-leaf-200/30"
               : "border-strawberry-100"
       } ${selected ? "ring-2 ring-leaf-500" : ""}`}
     >
-      <button type="button" className="mb-2 flex w-full items-center justify-between text-left" onClick={onSelect}>
-        <h3 className="text-sm font-semibold">
-          {t(role.name)} <span className="text-xs opacity-70">({roleCode})</span>
-        </h3>
-        <span className="rounded-full bg-strawberry-100 px-2 py-0.5 text-xs text-foreground dark:bg-strawberry-100/35">
+      <button type="button" className="mb-1 flex w-full items-center justify-between text-left" onClick={onSelect}>
+        <h3 className="text-sm font-semibold">{t(role.name)}</h3>
+        <span className="rounded-full bg-strawberry-50 px-2 py-0.5 text-xs font-bold text-strawberry-700">
           {count}/{target}
         </span>
       </button>
       <div className="mb-2 flex items-center justify-between">
         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${health.className}`}>{t(health.label)}</span>
+        {role.requiredGender && (
+          <span className="text-[10px] font-bold text-strawberry-700">{role.requiredGender === "FEMALE" ? t("Female only") : t("Male only")}</span>
+        )}
       </div>
       <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+function NotesEditor({
+  volunteer,
+  notes,
+  onClose,
+  onSaved,
+}: {
+  volunteer: VolunteerWithAck;
+  notes: AdminNote[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { t } = useLang();
+  const [category, setCategory] = useState<(typeof NOTE_CATEGORIES)[number]>("GENERAL");
+  const [text, setText] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!text.trim()) return;
+    setBusy(true);
+    await fetch("/api/admin/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volunteerId: volunteer.id, category, text, isPrivate }),
+    });
+    setText("");
+    setBusy(false);
+    await onSaved();
+  }
+
+  async function remove(id: string) {
+    await fetch(`/api/admin/notes?id=${id}`, { method: "DELETE" });
+    await onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="panel max-h-[85vh] w-full max-w-lg overflow-auto p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-black text-strawberry-900">{t("Admin Notes")}</h3>
+            <p className="font-mono text-xs font-bold text-strawberry-700">{volunteer.volunteerCode}</p>
+            <p className="text-sm">{volunteer.firstName} {volunteer.lastName}</p>
+          </div>
+          <button onClick={onClose} className="rounded-md border border-strawberry-200 px-2 py-1 text-sm">✕</button>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {notes.length === 0 ? (
+            <p className="text-sm text-foreground/60">{t("No notes yet.")}</p>
+          ) : (
+            notes.map((n) => (
+              <div key={n.id} className="rounded-lg border border-strawberry-100 p-2 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${noteCategoryTone(n.category)}`}>
+                    {n.category.replaceAll("_", " ")}
+                    {n.isPrivate && " 🔒"}
+                  </span>
+                  <button onClick={() => void remove(n.id)} className="text-xs text-strawberry-700 underline">{t("delete")}</button>
+                </div>
+                <p className="mt-1">{n.text}</p>
+                <p className="mt-0.5 text-[10px] text-foreground/50">
+                  {n.author} · {format(new Date(n.createdAt), "MMM d, yyyy HH:mm")}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-4 rounded-lg bg-muted p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-foreground/60">{t("Add note")}</p>
+          <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)} className="mt-1 w-full rounded-md border border-strawberry-200 px-2 py-2 text-sm">
+            {NOTE_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c.replaceAll("_", " ")}</option>
+            ))}
+          </select>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} className="mt-2 w-full rounded-md border border-strawberry-200 px-2 py-2 text-sm" placeholder={t("Freeform note…")} />
+          <label className="mt-1 flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+            {t("Private — only I can see this note")}
+          </label>
+          <button disabled={busy || !text.trim()} onClick={() => void save()} className="ops-btn ops-btn-primary mt-2 w-full px-4 py-2 text-sm disabled:opacity-50">
+            {t("Save Note")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VolunteerDetail({ volunteer, flags, onClose }: { volunteer: VolunteerWithAck; flags: VolunteerFlag[]; onClose: () => void }) {
+  const { t } = useLang();
+  const ack = volunteer.acknowledgement;
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="panel max-h-[85vh] w-full max-w-lg overflow-auto p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-mono text-sm font-black text-strawberry-700">{volunteer.volunteerCode}</p>
+            <h3 className="text-xl font-black text-strawberry-900">{volunteer.firstName} {volunteer.lastName}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-md border border-strawberry-200 px-2 py-1 text-sm">✕</button>
+        </div>
+        <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+          <p><strong>{t("Age at festival:")}</strong> {volunteerAge(volunteer)}</p>
+          <p><strong>{t("Gender:")}</strong> {volunteer.gender === "FEMALE" ? t("Female") : t("Male")}</p>
+          <p><strong>{t("Phone:")}</strong> {volunteer.phone}</p>
+          <p><strong>{t("Email:")}</strong> {volunteer.email}</p>
+          <p className="md:col-span-2"><strong>{t("Address:")}</strong> {volunteer.address || "—"}</p>
+          <p><strong>{t("Language:")}</strong> {volunteer.language === "BOTH" ? t("English & Spanish") : volunteer.language === "SPANISH" ? t("Spanish") : t("English")}</p>
+          <p><strong>{t("Legacy score:")}</strong> {volunteer.yearsExperience}</p>
+          <p><strong>{t("First time:")}</strong> {volunteer.firstTimeVolunteer ? t("Yes") : t("No")}</p>
+          <p><strong>{t("Orientation:")}</strong> {volunteer.orientationRsvp === "WILL_ATTEND" ? t("Will attend") : volunteer.orientationRsvp === "WILL_NOT_ATTEND" ? t("Will not attend") : "—"}</p>
+          <p><strong>{t("Emergency contact:")}</strong> {volunteer.emergencyContactName} · {volunteer.emergencyContactPhone}</p>
+          <p><strong>{t("Emergency call list:")}</strong> {volunteer.emergencyOptIn ? (volunteer.emergencyDates.length > 0 ? volunteer.emergencyDates.join(", ") : t("Yes")) : t("No")}</p>
+          <p><strong>{t("Sign-up time:")}</strong> {format(new Date(volunteer.createdAt), "MMM d, yyyy HH:mm")}</p>
+          <p className="md:col-span-2">
+            <strong>{t("Physical declaration:")}</strong>{" "}
+            {t("Standing:")} {ack?.standingWalking ? t("Yes") : t("No")} · {t("Lifting:")} {ack?.liftingCapacityLbs ?? 0} lbs · {t("Cash:")} {ack?.cashHandling ? t("Yes") : t("No")} · {t("Outdoor:")} {ack?.outdoorSun ? t("Yes") : t("No")}
+          </p>
+        </div>
+        {flags.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <p className="text-xs font-black uppercase tracking-wide text-amber-900">{t("Sign-up flags")}</p>
+            <ul className="mt-1 space-y-1 text-sm text-amber-950">
+              {flags.map((f) => (
+                <li key={f.id}>⚑ {f.detail ?? f.type.replaceAll("_", " ")}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -203,31 +342,34 @@ export function AdminDashboard() {
   const { t } = useLang();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [tab, setTab] = useState<Tab>("coverage");
+  const [loginName, setLoginName] = useState("");
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
   const [data, setData] = useState<AdminDataResponse | null>(null);
   const [shiftId, setShiftId] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>("ALL");
-  const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("ALL");
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("ALL");
   const [search, setSearch] = useState("");
   const [poolSearch, setPoolSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
+  const [autoWarnings, setAutoWarnings] = useState<AutoAssignWarningPayload[]>([]);
   const [force, setForce] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
   const [selectedVolunteerId, setSelectedVolunteerId] = useState<string>("");
   const [inspectorRoleId, setInspectorRoleId] = useState<string>("");
   const [selectedRoleFilterIds, setSelectedRoleFilterIds] = useState<string[]>([]);
-  const [roleSuggestions, setRoleSuggestions] = useState<Array<{ volunteerId: string; name: string; score: number; reasons: string[] }>>([]);
   const [activeDragVolunteerId, setActiveDragVolunteerId] = useState<string>("");
   const [coverageDateFilter, setCoverageDateFilter] = useState<string>("ALL");
-  const [coverageModuleFilter, setCoverageModuleFilter] = useState<ModuleFilter>("ALL");
   const [openCoverageDate, setOpenCoverageDate] = useState<string | null>(null);
   const [rosterSearch, setRosterSearch] = useState("");
   const [reminderDate, setReminderDate] = useState<string>(() => format(addDays(new Date(), 1), "yyyy-MM-dd"));
   const [reminderPreview, setReminderPreview] = useState<{ eligible: number; alreadyReminded: number; noOptIn: number; badPhone: number } | null>(null);
   const [reminderBusy, setReminderBusy] = useState(false);
+  const [notesVolunteerId, setNotesVolunteerId] = useState<string>("");
+  const [detailVolunteerId, setDetailVolunteerId] = useState<string>("");
+  const [shiftNoteText, setShiftNoteText] = useState("");
+  const [commsPrefillShiftId, setCommsPrefillShiftId] = useState<string | undefined>(undefined);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/data", { cache: "no-store" });
@@ -237,11 +379,9 @@ export function AdminDashboard() {
       return;
     }
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      setMessage(`Failed to load admin data (${res.status}). ${text ? "See server logs." : ""}`);
+      setMessage(`Failed to load admin data (${res.status}).`);
       return;
     }
-
     let payload: AdminDataResponse;
     try {
       payload = (await res.json()) as AdminDataResponse;
@@ -258,6 +398,10 @@ export function AdminDashboard() {
     void load();
   }, [load]);
 
+  const role = data?.session.role ?? "SCHEDULER";
+  const isSupervisorPlus = role === "SUPERVISOR" || role === "ADMIN";
+  const isAdmin = role === "ADMIN";
+
   const allDates = useMemo(() => {
     if (!data) return [];
     const unique = new Set(data.shifts.map((s) => format(new Date(s.date), "yyyy-MM-dd")));
@@ -269,11 +413,10 @@ export function AdminDashboard() {
     return data.shifts.filter((s) => {
       const dateKey = format(new Date(s.date), "yyyy-MM-dd");
       if (selectedDate !== "ALL" && dateKey !== selectedDate) return false;
-      if (moduleFilter !== "ALL" && s.module !== moduleFilter) return false;
       if (shiftFilter !== "ALL" && s.shiftType !== shiftFilter) return false;
       return true;
     });
-  }, [data, moduleFilter, selectedDate, shiftFilter]);
+  }, [data, selectedDate, shiftFilter]);
 
   useEffect(() => {
     if (!filteredShifts.length) return;
@@ -283,11 +426,7 @@ export function AdminDashboard() {
   }, [filteredShifts, shiftId]);
 
   useEffect(() => {
-    if (coverageDateFilter !== "ALL") {
-      setOpenCoverageDate(coverageDateFilter);
-    } else {
-      setOpenCoverageDate(null);
-    }
+    setOpenCoverageDate(coverageDateFilter !== "ALL" ? coverageDateFilter : null);
   }, [coverageDateFilter]);
 
   const previewReminders = useCallback(async (date: string) => {
@@ -301,14 +440,14 @@ export function AdminDashboard() {
 
   const selectedShift = useMemo(() => data?.shifts.find((s) => s.id === shiftId) ?? null, [data, shiftId]);
   const roleTargets = useMemo(() => (data ? data.roleTargets.filter((r) => r.shiftId === shiftId) : []), [data, shiftId]);
+  const shiftPublished = useMemo(() => data?.publishes.find((p) => p.shiftId === shiftId) ?? null, [data, shiftId]);
+  const scheduleLocked = !!shiftPublished && !isSupervisorPlus;
 
   const displayedRoles = useMemo(() => {
     if (!data || !selectedShift) return [];
     const roleIds = new Set(roleTargets.map((r) => r.roleId));
-    if (selectedShift.module === "BOOTH" && roleIds.size > 0) {
-      return data.roles.filter((r) => roleIds.has(r.id));
-    }
-    return data.roles.filter((r) => r.module === selectedShift.module && !r.manualOnly);
+    if (roleIds.size > 0) return data.roles.filter((r) => roleIds.has(r.id));
+    return data.roles.filter((r) => r.module === "BOOTH" && !r.manualOnly && !r.infoOnly);
   }, [data, roleTargets, selectedShift]);
 
   useEffect(() => {
@@ -332,61 +471,55 @@ export function AdminDashboard() {
     return displayedRoles.find((r) => r.id === inspectorRoleId) || null;
   }, [displayedRoles, inspectorRoleId]);
 
-  const selectedVolunteerAssignmentsToday = useMemo(() => {
-    if (!data || !selectedVolunteer || !selectedShift) return [];
-    const shiftDate = format(new Date(selectedShift.date), "yyyy-MM-dd");
-    return data.assignments.filter(
-      (a) =>
-        a.volunteerId === selectedVolunteer.id &&
-        format(new Date(a.shift.date), "yyyy-MM-dd") === shiftDate,
-    );
-  }, [data, selectedShift, selectedVolunteer]);
-
   const availabilitySet = useMemo(() => {
     if (!data) return new Set<string>();
     return new Set(data.availability.filter((a) => a.shiftId === shiftId).map((a) => a.volunteerId));
   }, [data, shiftId]);
 
-  const roleCodeMap = useMemo(() => {
-    const m = new Map<string, string>();
-    displayedRoles.forEach((role, idx) => m.set(role.id, `R${idx + 1}`));
-    return m;
-  }, [displayedRoles]);
-
-  const volunteerCodeMap = useMemo(() => {
-    if (!data) return new Map<string, string>();
-    const m = new Map<string, string>();
-    data.volunteers.forEach((v, idx) => {
-      const short = v.id.slice(-3).toUpperCase();
-      m.set(v.id, `V${String(idx + 1).padStart(3, "0")}-${short}`);
-    });
+  const flagsByVolunteer = useMemo(() => {
+    const m = new Map<string, VolunteerFlag[]>();
+    if (data) {
+      for (const f of data.flags) {
+        const list = m.get(f.volunteerId) ?? [];
+        list.push(f);
+        m.set(f.volunteerId, list);
+      }
+    }
     return m;
   }, [data]);
 
+  const notesByVolunteer = useMemo(() => {
+    const m = new Map<string, AdminNote[]>();
+    if (data) {
+      for (const n of data.adminNotes) {
+        const list = m.get(n.volunteerId) ?? [];
+        list.push(n);
+        m.set(n.volunteerId, list);
+      }
+    }
+    return m;
+  }, [data]);
+
+  // Eligibility per volunteer × position: hard reasons block the drop; soft
+  // warnings surface inline without blocking (per the 2027 autofill spec).
   const roleEligibilityMap = useMemo(() => {
-    const map = new Map<string, { eligible: boolean; reasons: string[] }>();
+    const map = new Map<string, { eligible: boolean; hard: string[]; soft: string[] }>();
     if (!data || !selectedShift) return map;
     const shiftDay = format(new Date(selectedShift.date), "yyyy-MM-dd");
 
     for (const volunteer of data.volunteers) {
-      const ack = volunteer.acknowledgement;
-      for (const role of displayedRoles) {
-        const reasons: string[] = [];
+      for (const roleRow of displayedRoles) {
+        const hard: string[] = [];
+        if (!availabilitySet.has(volunteer.id)) hard.push("Not available");
+        hard.push(...hardReasonsFor(volunteer, roleRow));
 
-        if (!availabilitySet.has(volunteer.id)) reasons.push("Not available");
-        if (role.requiredGender && volunteer.gender !== role.requiredGender) reasons.push("Gender mismatch");
-        if (role.requiresStanding && !ack?.standingWalking) reasons.push("No standing ack");
-        if (role.requiresHeavyLift && !ack?.heavyLift50) reasons.push("No heavy ack");
-        if (role.requiresCash && !ack?.cashHandling) reasons.push("No cash ack");
-        if (role.requiresOutdoor && !ack?.outdoorSun) reasons.push("No outdoor ack");
-
-        if (role.requiresTraining) {
-          const trained = data.trainings.find((t) => t.volunteerId === volunteer.id && t.roleId === role.id)?.trained || false;
-          if (!trained) reasons.push("Training required");
+        if (roleRow.requiresTraining) {
+          const trained = data.trainings.find((tr) => tr.volunteerId === volunteer.id && tr.roleId === roleRow.id)?.trained || false;
+          if (!trained) hard.push("Training required");
         }
-        if (role.requiresApproval) {
-          const approved = data.approvals.find((a) => a.volunteerId === volunteer.id && a.roleId === role.id)?.approved || false;
-          if (!approved) reasons.push("Approval required");
+        if (roleRow.requiresApproval) {
+          const approved = data.approvals.find((a) => a.volunteerId === volunteer.id && a.roleId === roleRow.id)?.approved || false;
+          if (!approved) hard.push("Approval required");
         }
 
         const dayAssignments = data.assignments.filter(
@@ -398,16 +531,20 @@ export function AdminDashboard() {
           const aEnd = new Date(a.shift.conflictEndAt).getTime();
           const sStart = new Date(selectedShift.conflictStartAt).getTime();
           const sEnd = new Date(selectedShift.conflictEndAt).getTime();
-          if (aStart < sEnd && sStart < aEnd) reasons.push("Time conflict");
+          if (aStart < sEnd && sStart < aEnd) hard.push("Time conflict");
           if (
             (a.shift.shiftType === "BOOTH_DAY" && selectedShift.shiftType === "BOOTH_NIGHT") ||
             (a.shift.shiftType === "BOOTH_NIGHT" && selectedShift.shiftType === "BOOTH_DAY")
           ) {
-            reasons.push("Booth day/night conflict");
+            hard.push("Day/Night same-date rule");
           }
         }
 
-        map.set(`${volunteer.id}:${role.id}`, { eligible: reasons.length === 0, reasons });
+        map.set(`${volunteer.id}:${roleRow.id}`, {
+          eligible: hard.length === 0,
+          hard,
+          soft: softWarningsFor(volunteer, roleRow),
+        });
       }
     }
     return map;
@@ -415,80 +552,23 @@ export function AdminDashboard() {
 
   const availablePool = useMemo(() => {
     if (!data || !selectedShift) return [];
-    const availableVolunteerIds = new Set(data.availability.filter((a) => a.shiftId === shiftId).map((a) => a.volunteerId));
     const assignedIds = new Set(assigned.map((a) => a.volunteerId));
     const q = `${search} ${poolSearch}`.trim().toLowerCase();
 
     const basePool = data.volunteers
-      .filter((v) => availableVolunteerIds.has(v.id) && !assignedIds.has(v.id))
+      .filter((v) => availabilitySet.has(v.id) && !assignedIds.has(v.id))
       .filter((v) => {
         if (!q) return true;
-        const full = `${v.firstName} ${v.lastName}`.toLowerCase();
+        const full = `${v.firstName} ${v.lastName} ${v.volunteerCode ?? ""}`.toLowerCase();
         return full.includes(q) || v.email.toLowerCase().includes(q) || v.phone.toLowerCase().includes(q);
-      });
+      })
+      // Autofill priority order: legacy score DESC, sign-up time ASC.
+      .sort((a, b) => b.yearsExperience - a.yearsExperience || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     if (selectedRoleFilterIds.length === 0) return basePool;
     return basePool.filter((v) =>
       selectedRoleFilterIds.some((roleId) => roleEligibilityMap.get(`${v.id}:${roleId}`)?.eligible),
     );
-  }, [assigned, data, poolSearch, roleEligibilityMap, search, selectedRoleFilterIds, selectedShift, shiftId]);
-
-  const roleForAttention = useMemo(() => {
-    if (selectedRole) return selectedRole;
-    return displayedRoles[0] || null;
-  }, [displayedRoles, selectedRole]);
-
-  const needsAttention = useMemo(() => {
-    if (!data || !selectedShift || !roleForAttention) return [] as Array<{ volunteer: Volunteer; reasons: string[] }>;
-    const shiftDay = format(new Date(selectedShift.date), "yyyy-MM-dd");
-    const assignedIds = new Set(assigned.map((a) => a.volunteerId));
-
-    const pool = data.volunteers.filter((v) => availabilitySet.has(v.id) && !assignedIds.has(v.id));
-    const records = pool
-      .map((volunteer) => {
-        const reasons: string[] = [];
-        const ack = volunteer.acknowledgement;
-        if (roleForAttention.requiredGender && volunteer.gender !== roleForAttention.requiredGender) {
-          reasons.push(`Gender mismatch (${roleForAttention.requiredGender})`);
-        }
-        if (roleForAttention.requiresStanding && !ack?.standingWalking) reasons.push("Missing standing ack");
-        if (roleForAttention.requiresHeavyLift && !ack?.heavyLift50) reasons.push("Missing heavy-lift ack");
-        if (roleForAttention.requiresCash && !ack?.cashHandling) reasons.push("Missing cash ack");
-        if (roleForAttention.requiresOutdoor && !ack?.outdoorSun) reasons.push("Missing outdoor ack");
-
-        if (roleForAttention.requiresTraining) {
-          const trained = data.trainings.find((t) => t.volunteerId === volunteer.id && t.roleId === roleForAttention.id)?.trained || false;
-          if (!trained) reasons.push("Training required");
-        }
-        if (roleForAttention.requiresApproval) {
-          const approved = data.approvals.find((a) => a.volunteerId === volunteer.id && a.roleId === roleForAttention.id)?.approved || false;
-          if (!approved) reasons.push("Approval required");
-        }
-
-        const dayAssignments = data.assignments.filter(
-          (a) => a.volunteerId === volunteer.id && format(new Date(a.shift.date), "yyyy-MM-dd") === shiftDay,
-        );
-        for (const a of dayAssignments) {
-          if (a.shiftId === selectedShift.id) continue;
-          const aStart = new Date(a.shift.conflictStartAt).getTime();
-          const aEnd = new Date(a.shift.conflictEndAt).getTime();
-          const sStart = new Date(selectedShift.conflictStartAt).getTime();
-          const sEnd = new Date(selectedShift.conflictEndAt).getTime();
-          if (aStart < sEnd && sStart < aEnd) reasons.push("Time overlap conflict");
-          if (
-            (a.shift.shiftType === "BOOTH_DAY" && selectedShift.shiftType === "BOOTH_NIGHT") ||
-            (a.shift.shiftType === "BOOTH_NIGHT" && selectedShift.shiftType === "BOOTH_DAY")
-          ) {
-            reasons.push("Booth day/night same date rule");
-          }
-        }
-
-        return { volunteer, reasons };
-      })
-      .filter((x) => x.reasons.length > 0)
-      .sort((a, b) => b.reasons.length - a.reasons.length);
-
-    return records.slice(0, 10);
-  }, [assigned, availabilitySet, data, roleForAttention, selectedShift]);
+  }, [assigned, availabilitySet, data, poolSearch, roleEligibilityMap, search, selectedRoleFilterIds, selectedShift]);
 
   const coverageSummary = useMemo(() => {
     if (!data) return [];
@@ -527,87 +607,44 @@ export function AdminDashboard() {
     const q = rosterSearch.trim().toLowerCase();
     if (!q) return data.volunteers;
     return data.volunteers.filter((v) => {
-      const full = `${v.firstName} ${v.lastName}`.toLowerCase();
+      const full = `${v.firstName} ${v.lastName} ${v.volunteerCode ?? ""}`.toLowerCase();
       return full.includes(q) || v.email.toLowerCase().includes(q) || v.phone.toLowerCase().includes(q);
     });
   }, [data, rosterSearch]);
 
   const scheduleSummary = useMemo(() => {
     if (!selectedShift) return null;
-    const totalTarget = roleTargets.reduce((sum, t) => sum + t.target, 0);
+    const totalTarget = roleTargets.reduce((sum, rt) => sum + rt.target, 0);
     const assignedCount = assigned.length;
-    const unfilled = Math.max(0, totalTarget - assignedCount);
-    const lockedCount = assigned.filter((a) => a.locked).length;
     return {
       totalTarget,
       assignedCount,
-      unfilled,
+      unfilled: Math.max(0, totalTarget - assignedCount),
       availableCount: availablePool.length,
-      lockedCount,
+      lockedCount: assigned.filter((a) => a.locked).length,
     };
   }, [assigned, availablePool.length, roleTargets, selectedShift]);
 
-  const eligibilityReasons = useMemo(() => {
-    if (!selectedVolunteer || !selectedRole || !selectedShift || !data) return [] as string[];
-    const reasons: string[] = [];
-    const ack = selectedVolunteer.acknowledgement;
-
-    if (!availabilitySet.has(selectedVolunteer.id)) reasons.push("Not marked available for this shift.");
-    if (selectedRole.requiredGender && selectedVolunteer.gender !== selectedRole.requiredGender) {
-      reasons.push(`Requires gender: ${selectedRole.requiredGender}.`);
-    }
-    if (selectedRole.requiresStanding && !ack?.standingWalking) reasons.push("Missing standing/walking acknowledgement.");
-    if (selectedRole.requiresHeavyLift && !ack?.heavyLift50) reasons.push("Missing heavy-lift acknowledgement.");
-    if (selectedRole.requiresCash && !ack?.cashHandling) reasons.push("Missing cash-handling acknowledgement.");
-    if (selectedRole.requiresOutdoor && !ack?.outdoorSun) reasons.push("Missing outdoor/sun acknowledgement.");
-
-    if (selectedRole.requiresTraining) {
-      const trained = data.trainings.find((t) => t.volunteerId === selectedVolunteer.id && t.roleId === selectedRole.id)?.trained || false;
-      if (!trained) reasons.push("Training required but not completed.");
-    }
-    if (selectedRole.requiresApproval) {
-      const approved = data.approvals.find((a) => a.volunteerId === selectedVolunteer.id && a.roleId === selectedRole.id)?.approved || false;
-      if (!approved) reasons.push("Approval required but not granted.");
-    }
-
-    const shiftDay = format(new Date(selectedShift.date), "yyyy-MM-dd");
-    const volunteerDayAssignments = data.assignments.filter(
-      (a) => a.volunteerId === selectedVolunteer.id && format(new Date(a.shift.date), "yyyy-MM-dd") === shiftDay,
-    );
-
-    for (const a of volunteerDayAssignments) {
-      if (a.shiftId === selectedShift.id) continue;
-      const aStart = new Date(a.shift.conflictStartAt).getTime();
-      const aEnd = new Date(a.shift.conflictEndAt).getTime();
-      const sStart = new Date(selectedShift.conflictStartAt).getTime();
-      const sEnd = new Date(selectedShift.conflictEndAt).getTime();
-      const overlaps = aStart < sEnd && sStart < aEnd;
-      if (overlaps) reasons.push(`Time overlap with existing assignment: ${a.shift.label} (${a.role.name}).`);
-      const boothDual =
-        (a.shift.shiftType === "BOOTH_DAY" && selectedShift.shiftType === "BOOTH_NIGHT") ||
-        (a.shift.shiftType === "BOOTH_NIGHT" && selectedShift.shiftType === "BOOTH_DAY");
-      if (boothDual) reasons.push("Cannot assign Booth Day and Booth Night on the same date.");
-    }
-
-    return reasons;
-  }, [availabilitySet, data, selectedRole, selectedShift, selectedVolunteer]);
+  const currentShiftNotes = useMemo(
+    () => (data ? data.shiftNotes.filter((n) => n.shiftId === shiftId) : []),
+    [data, shiftId],
+  );
 
   const getVolunteerFit = useCallback(
     (volunteerId: string, roleIds?: string[]) => {
       const sourceRoles =
-        roleIds && roleIds.length > 0
-          ? displayedRoles.filter((role) => roleIds.includes(role.id))
-          : displayedRoles;
-      const eligibleCodes = sourceRoles
-        .filter((role) => roleEligibilityMap.get(`${volunteerId}:${role.id}`)?.eligible)
-        .map((role) => roleCodeMap.get(role.id) || role.name);
+        roleIds && roleIds.length > 0 ? displayedRoles.filter((r) => roleIds.includes(r.id)) : displayedRoles;
+      const eligibleNames = sourceRoles
+        .filter((r) => roleEligibilityMap.get(`${volunteerId}:${r.id}`)?.eligible)
+        .map((r) => r.name);
       return {
-        count: eligibleCodes.length,
-        codes: eligibleCodes,
-        summary: eligibleCodes.length ? `Fits ${eligibleCodes.length}: ${eligibleCodes.slice(0, 4).join(", ")}${eligibleCodes.length > 4 ? "…" : ""}` : "Fits 0 roles",
+        count: eligibleNames.length,
+        summary: eligibleNames.length
+          ? `${t("Fits")} ${eligibleNames.length}: ${eligibleNames.slice(0, 3).join(", ")}${eligibleNames.length > 3 ? "…" : ""}`
+          : t("Fits 0 positions"),
       };
     },
-    [displayedRoles, roleCodeMap, roleEligibilityMap],
+    [displayedRoles, roleEligibilityMap, t],
   );
 
   function toggleRoleFilter(roleId: string) {
@@ -618,8 +655,7 @@ export function AdminDashboard() {
     (roleId: string): "idle" | "eligible" | "ineligible" => {
       if (!activeDragVolunteerId) return "idle";
       const eligible = roleEligibilityMap.get(`${activeDragVolunteerId}:${roleId}`)?.eligible;
-      if (eligible === true) return "eligible";
-      return "ineligible";
+      return eligible === true ? "eligible" : "ineligible";
     },
     [activeDragVolunteerId, roleEligibilityMap],
   );
@@ -628,7 +664,7 @@ export function AdminDashboard() {
     const res = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ name: loginName, password }),
     });
     if (res.ok) {
       await load();
@@ -647,14 +683,23 @@ export function AdminDashboard() {
       body: JSON.stringify({ shiftId }),
     });
     const payload = await res.json();
-    setMessage(res.ok ? t("Auto-assignment complete") : payload.error || t("Auto-assignment failed"));
+    if (res.ok) {
+      setAutoWarnings(payload.warnings ?? []);
+      setMessage(
+        payload.warnings?.length
+          ? `${t("Autofill complete")} — ${payload.warnings.length} ${t("placement(s) need your confirmation below.")}`
+          : t("Autofill complete"),
+      );
+    } else {
+      setMessage(payload.error || t("Autofill failed"));
+    }
     setLoading(false);
     await load();
   }
 
   async function assignSelectedFromInspector() {
     if (!selectedVolunteer || !selectedRole || !selectedShift) {
-      setMessage(t("Select a volunteer and role first."));
+      setMessage(t("Select a volunteer and position first."));
       return;
     }
     const res = await fetch("/api/admin/assignments", {
@@ -669,27 +714,8 @@ export function AdminDashboard() {
       }),
     });
     const payload = await res.json();
-    setMessage(res.ok ? payload.warning || t("Assigned from inspector.") : payload.error || t("Assignment failed"));
+    setMessage(res.ok ? payload.warning || t("Assigned.") : payload.error || t("Assignment failed"));
     await load();
-  }
-
-  async function loadSuggestionsForRole() {
-    if (!selectedShift || !selectedRole) {
-      setMessage(t("Select a shift and role first."));
-      return;
-    }
-    const res = await fetch("/api/admin/suggestions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shiftId: selectedShift.id, roleId: selectedRole.id, limit: 3 }),
-    });
-    const payload = await res.json().catch(() => ({ suggestions: [] }));
-    if (!res.ok) {
-      setMessage(payload.error || t("Failed to load suggestions"));
-      return;
-    }
-    setRoleSuggestions(payload.suggestions || []);
-    setMessage(`${t("Loaded")} ${payload.suggestions?.length ?? 0} ${t("replacement suggestions.")}`);
   }
 
   async function runBulkAction(action: "clear_unlocked" | "lock_all" | "unlock_all" | "auto_assign_unfilled") {
@@ -702,19 +728,17 @@ export function AdminDashboard() {
     });
     const payload = await res.json();
     if (res.ok) {
-      const msg =
-        action === "clear_unlocked"
-          ? `${t("Cleared")} ${payload.count ?? 0} ${t("unlocked assignments")}`
-          : action === "lock_all"
-            ? `${t("Locked")} ${payload.count ?? 0} ${t("assignments")}`
-            : action === "unlock_all"
-              ? `${t("Unlocked")} ${payload.count ?? 0} ${t("assignments")}`
-              : `${t("Auto-assigned unfilled roles")} (${payload.count ?? 0} ${t("total assignments now")})`;
-      setMessage(msg);
+      if (action === "auto_assign_unfilled") setAutoWarnings(payload.warnings ?? []);
+      setMessage(`${t("Done")} (${payload.count ?? 0})`);
     } else {
       setMessage(payload.error || t("Bulk action failed"));
     }
     setLoading(false);
+    await load();
+  }
+
+  async function removeAssignment(id: string) {
+    await fetch(`/api/admin/assignments?id=${id}`, { method: "DELETE" });
     await load();
   }
 
@@ -736,6 +760,17 @@ export function AdminDashboard() {
     await load();
   }
 
+  async function saveShiftNote() {
+    if (!shiftNoteText.trim() || !shiftId) return;
+    await fetch("/api/admin/shift-notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shiftId, text: shiftNoteText }),
+    });
+    setShiftNoteText("");
+    await load();
+  }
+
   async function onDragEnd(event: DragEndEvent) {
     setActiveDragVolunteerId("");
     if (!event.over) return;
@@ -746,8 +781,8 @@ export function AdminDashboard() {
     const volunteerId = active.replace("pool:", "");
     const roleId = over.replace("role:", "");
     const eligibility = roleEligibilityMap.get(`${volunteerId}:${roleId}`);
-    if (!eligibility?.eligible) {
-      setMessage(`${t("Cannot assign:")} ${eligibility?.reasons.map((r) => t(r)).join(", ") || t("Ineligible for role")}`);
+    if (!eligibility?.eligible && !force) {
+      setMessage(`${t("Cannot assign:")} ${eligibility?.hard.map((r) => t(r)).join(", ") || t("Not eligible for this position")}`);
       setSelectedVolunteerId(volunteerId);
       setInspectorRoleId(roleId);
       return;
@@ -769,16 +804,6 @@ export function AdminDashboard() {
     setSelectedVolunteerId(volunteerId);
     setInspectorRoleId(roleId);
     await load();
-  }
-
-  async function saveNote(volunteerId: string, notes: string) {
-    const res = await fetch("/api/admin/notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ volunteerId, notes }),
-    });
-    setMessage(res.ok ? t("Note saved.") : t("Failed to save note."));
-    if (res.ok) await load();
   }
 
   async function toggleTraining(volunteerId: string, roleId: string, trained: boolean) {
@@ -825,16 +850,31 @@ export function AdminDashboard() {
 
   if (!authed) {
     return (
-      <section className="panel max-w-md p-5">
-        <h2 className="text-xl font-bold">{t("Admin Login")}</h2>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mt-3 w-full rounded-lg border border-strawberry-200 px-3 py-2"
-          placeholder={t("Admin password")}
-        />
-        <button onClick={login} className="mt-3 rounded-lg bg-strawberry-500 px-4 py-2 text-sm font-semibold text-white">
+      <section className="panel mx-auto max-w-md p-6">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/topper.svg" alt="" className="mx-auto w-24" />
+        <h2 className="mt-2 text-center text-2xl font-black text-strawberry-900">{t("Staff Login")}</h2>
+        <p className="mt-1 text-center text-xs text-foreground/60">{t("Schedulers, supervisors, and admins")}</p>
+        <label className="mt-4 block text-sm">
+          <span className="mb-1 block font-bold">{t("Your name")}</span>
+          <input
+            value={loginName}
+            onChange={(e) => setLoginName(e.target.value)}
+            className="w-full rounded-lg border border-strawberry-200 px-3 py-2"
+            placeholder={t("e.g. Trish")}
+          />
+        </label>
+        <label className="mt-3 block text-sm">
+          <span className="mb-1 block font-bold">{t("Password")}</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void login()}
+            className="w-full rounded-lg border border-strawberry-200 px-3 py-2"
+          />
+        </label>
+        <button onClick={() => void login()} className="ops-btn ops-btn-primary mt-4 w-full px-4 py-3 text-sm">
           {t("Sign In")}
         </button>
         {message && <p className="mt-2 text-sm text-red-700">{message}</p>}
@@ -842,101 +882,91 @@ export function AdminDashboard() {
     );
   }
 
+  const tabs: Array<[Tab, string, boolean]> = [
+    ["coverage", "Coverage Calendar", true],
+    ["schedule", "Scheduler", true],
+    ["volunteers", "Volunteers", true],
+    ["training", "Training & Approvals", true],
+    ["supervisor", "Supervisor", true],
+    ["hall", "Hall Log", true],
+    ["comms", "Communication", true],
+    ["analytics", "Analytics", isAdmin],
+  ];
+
   return (
     <div className="space-y-4">
+      {data && notesVolunteerId && (() => {
+        const v = data.volunteers.find((x) => x.id === notesVolunteerId);
+        if (!v) return null;
+        return (
+          <NotesEditor
+            volunteer={v}
+            notes={notesByVolunteer.get(v.id) ?? []}
+            onClose={() => setNotesVolunteerId("")}
+            onSaved={load}
+          />
+        );
+      })()}
+      {data && detailVolunteerId && (() => {
+        const v = data.volunteers.find((x) => x.id === detailVolunteerId);
+        if (!v) return null;
+        return <VolunteerDetail volunteer={v} flags={flagsByVolunteer.get(v.id) ?? []} onClose={() => setDetailVolunteerId("")} />;
+      })()}
+
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {([
-            ["coverage", "Coverage Calendar"],
-            ["schedule", "Day Detail + Board"],
-            ["volunteers", "Volunteers"],
-            ["training", "Training & Approvals"],
-          ] as const).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`rounded-md px-3 py-1.5 text-sm ${tab === id ? "bg-strawberry-500 text-white" : "bg-strawberry-50/80 text-foreground dark:bg-strawberry-100/25"}`}
-            >
-              {t(label)}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {tabs
+            .filter(([, , show]) => show)
+            .map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${tab === id ? "bg-strawberry-500 text-white" : "bg-strawberry-50 text-strawberry-900"}`}
+              >
+                {t(label)}
+              </button>
+            ))}
         </div>
         <div className="flex items-center gap-2">
+          <span className="rounded-full bg-leaf-200 px-3 py-1 text-xs font-bold text-leaf-700">
+            {data?.session.name} · {t(role)}
+          </span>
           <Link href="/admin/print" className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
             {t("Print Center")}
           </Link>
           <Link href="/admin/captain" className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
-            {t("Supervisor Mode")}
+            {t("Check-In Mode")}
           </Link>
-          <button onClick={logout} className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
+          <button onClick={() => void logout()} className="rounded-md border border-strawberry-300 px-3 py-1.5 text-sm">
             {t("Logout")}
           </button>
         </div>
       </div>
 
-      <div className="no-print flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-foreground/60">{t("Area")}</span>
-        {([
-          ["ALL", t("All")],
-          ["BOOTH", t("Booth")],
-          ["HALL", t("Hall")],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => {
-              setModuleFilter(key);
-              setCoverageModuleFilter(key);
-            }}
-            className={`rounded-md px-3 py-1 text-sm font-semibold ${moduleFilter === key ? "bg-leaf-500 text-white" : "bg-strawberry-50/80 text-foreground dark:bg-strawberry-100/25"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {tab === "coverage" && data && (
         <section className="space-y-3">
           <div className="panel p-3">
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="text-sm">
-                <span className="mb-1 block font-semibold">{t("Coverage Date")}</span>
-                <select
-                  value={coverageDateFilter}
-                  onChange={(e) => setCoverageDateFilter(e.target.value)}
-                  className="w-full rounded-md border border-strawberry-200 px-2 py-2"
-                >
-                  <option value="ALL">{t("All dates")}</option>
-                  {allDates.map((d) => (
-                    <option key={d} value={d}>
-                      {format(new Date(`${d}T00:00:00`), "EEE MMM d")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                <span className="mb-1 block font-semibold">{t("Coverage Module")}</span>
-                <select
-                  value={coverageModuleFilter}
-                  onChange={(e) => setCoverageModuleFilter(e.target.value as ModuleFilter)}
-                  className="w-full rounded-md border border-strawberry-200 px-2 py-2"
-                >
-                  <option value="ALL">{t("All modules")}</option>
-                  <option value="BOOTH">{t("Booth only")}</option>
-                  <option value="HALL">{t("Hall only")}</option>
-                </select>
-              </label>
-            </div>
+            <label className="text-sm">
+              <span className="mb-1 block font-semibold">{t("Coverage Date")}</span>
+              <select
+                value={coverageDateFilter}
+                onChange={(e) => setCoverageDateFilter(e.target.value)}
+                className="w-full rounded-md border border-strawberry-200 px-2 py-2 md:max-w-xs"
+              >
+                <option value="ALL">{t("All dates")}</option>
+                {allDates.map((d) => (
+                  <option key={d} value={d}>
+                    {format(new Date(`${d}T00:00:00`), "EEE MMM d")}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {(() => {
             const grouped = Object.entries(
               coverageSummary
-                .filter((item) => {
-                  if (coverageDateFilter !== "ALL" && item.date !== coverageDateFilter) return false;
-                  if (coverageModuleFilter === "BOOTH" && !item.shiftType.startsWith("BOOTH_")) return false;
-                  if (coverageModuleFilter === "HALL" && !item.shiftType.startsWith("HALL_")) return false;
-                  return true;
-                })
+                .filter((item) => coverageDateFilter === "ALL" || item.date === coverageDateFilter)
                 .reduce<Record<string, typeof coverageSummary>>((acc, item) => {
                   if (!acc[item.date]) acc[item.date] = [];
                   acc[item.date].push(item);
@@ -945,76 +975,51 @@ export function AdminDashboard() {
             ).sort(([a], [b]) => (a < b ? -1 : 1));
 
             if (grouped.length === 0) {
-              return <p className="panel p-3 text-sm text-foreground/90">{t("No coverage rows match the current filters.")}</p>;
+              return <p className="panel p-3 text-sm">{t("No coverage rows match the current filters.")}</p>;
             }
 
             return grouped.map(([date, items]) => {
-            const isOpen = openCoverageDate === date;
-            return (
-            <div key={date} className="panel p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpenCoverageDate((current) => (current === date ? null : date))}
-                  className="flex flex-1 items-center justify-between rounded-md border border-strawberry-100 bg-card px-3 py-2 text-left"
-                >
-                  <span className="text-sm font-semibold">{format(new Date(`${date}T00:00:00`), "EEEE, MMM d")}</span>
-                  <span className="text-xs font-semibold text-foreground">{isOpen ? t("Hide") : t("Show")}</span>
-                </button>
-                <span className="rounded-full bg-strawberry-100/80 px-2 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/25">
-                  {items.length} {t("shifts")}
-                </span>
-              </div>
-              {isOpen && (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {[
-                  { title: "Booth", list: items.filter((i) => i.shiftType.startsWith("BOOTH_")) },
-                  { title: "Hall", list: items.filter((i) => i.shiftType.startsWith("HALL_")) },
-                ].map((group) => (
-                  <div key={group.title} className="rounded-lg border border-strawberry-100/80 p-2">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground">{t(group.title)}</p>
-                    <div className="space-y-2">
-                      {group.list
-                        .sort((a, b) => shiftSortWeight(a.shiftType) - shiftSortWeight(b.shiftType))
-                        .map((item) => (
+              const isOpen = openCoverageDate === date || coverageDateFilter === "ALL";
+              return (
+                <div key={date} className="panel p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpenCoverageDate((current) => (current === date ? null : date))}
+                      className="flex flex-1 items-center justify-between rounded-md border border-strawberry-100 bg-card px-3 py-2 text-left"
+                    >
+                      <span className="text-sm font-bold">{format(new Date(`${date}T00:00:00`), "EEEE, MMM d")}</span>
+                      <span className="text-xs font-semibold">{items.length} {t("shifts")}</span>
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      {items.map((item) => {
+                        const published = data.publishes.some((p) => p.shiftId === item.shiftId);
+                        return (
                           <button
                             key={item.shiftId}
                             onClick={() => {
                               setShiftId(item.shiftId);
                               setTab("schedule");
                             }}
-                            className={`w-full rounded-lg border p-3 text-left ${shiftToneClasses(item.shiftType)}`}
+                            className={`rounded-lg border-2 p-3 text-left ${shiftToneClasses(item.shiftType)}`}
                           >
-                            <p className="text-xs font-semibold uppercase tracking-wide text-white">{t("Shift")}</p>
-                            <p className="text-sm font-semibold tracking-wide text-white">{t(formatShiftTypeLabel(item.shiftType))}</p>
-                            <p className="mt-1 text-xs text-slate-100">{t(shiftDescription(item.shiftType))}</p>
-                            <div className="mt-2 grid grid-cols-3 gap-2">
-                              <div className="rounded-md bg-slate-700/95 px-2 py-1">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">{t("Filled")}</p>
-                                <p className="text-base font-black text-white">{item.filled}</p>
-                              </div>
-                              <div className="rounded-md bg-slate-700/95 px-2 py-1">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">{t("Target")}</p>
-                                <p className="text-base font-black text-white">{item.targets > 0 ? item.targets : t("Not set")}</p>
-                              </div>
-                              <div className="rounded-md bg-slate-700/95 px-2 py-1">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-100">{t("Status")}</p>
-                                <span className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.health.className}`}>{t(item.health.label)}</span>
-                              </div>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-black">{t(shiftShortLabel(item.shiftType))}</p>
+                              {published && <span className="rounded-full bg-leaf-500 px-1.5 py-0.5 text-[10px] font-black text-white">✓</span>}
                             </div>
-                            <p className="mt-2 text-[11px] text-slate-100">{t("Click card to open this shift in Day Detail.")}</p>
+                            <div className="mt-2 flex items-center justify-between text-sm">
+                              <span className="font-black">{item.filled}/{item.targets > 0 ? item.targets : "—"}</span>
+                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.health.className}`}>{t(item.health.label)}</span>
+                            </div>
                           </button>
-                        ))}
-                      {group.list.length === 0 && (
-                        <p className="rounded-md border border-strawberry-100 bg-card px-2 py-2 text-xs text-foreground/90">{t("No shifts of this type for this date.")}</p>
-                      )}
+                        );
+                      })}
                     </div>
-                  </div>
-                ))}
-              </div>
-              )}
-            </div>
-            );
+                  )}
+                </div>
+              );
             });
           })()}
         </section>
@@ -1051,33 +1056,41 @@ export function AdminDashboard() {
               </p>
             )}
           </div>
+
+          {shiftPublished && (
+            <p className="panel border-leaf-500 bg-leaf-200/40 p-3 text-sm font-semibold text-leaf-700">
+              ✓ {t("This shift's schedule was published by")} {shiftPublished.publishedBy} ({format(new Date(shiftPublished.publishedAt), "MMM d HH:mm")}).
+              {scheduleLocked ? ` ${t("It is locked — a supervisor or admin can unpublish it to make changes.")}` : ` ${t("You can still override as supervisor/admin.")}`}
+            </p>
+          )}
+
           {scheduleSummary && (
             <div className="panel grid gap-2 p-3 text-sm md:grid-cols-5">
-              <div className="rounded-md bg-strawberry-50/80 px-3 py-2 text-foreground dark:bg-strawberry-100/25">
-                <p className="text-xs uppercase text-foreground/90">{t("Target Slots")}</p>
+              <div className="rounded-md bg-strawberry-50 px-3 py-2">
+                <p className="text-xs uppercase">{t("Slots Needed")}</p>
                 <p className="text-lg font-black text-strawberry-700">{scheduleSummary.totalTarget}</p>
               </div>
-              <div className="rounded-md bg-leaf-200/35 px-3 py-2 text-foreground dark:bg-leaf-200/25">
-                <p className="text-xs uppercase text-foreground/90">{t("Assigned")}</p>
+              <div className="rounded-md bg-leaf-200/50 px-3 py-2">
+                <p className="text-xs uppercase">{t("Filled")}</p>
                 <p className="text-lg font-black text-leaf-700">{scheduleSummary.assignedCount}</p>
               </div>
-              <div className="rounded-md bg-amber-100 px-3 py-2 text-foreground dark:bg-amber-700/40 dark:text-amber-100">
-                <p className="text-xs uppercase text-foreground/90">{t("Unfilled")}</p>
+              <div className="rounded-md bg-amber-100 px-3 py-2">
+                <p className="text-xs uppercase">{t("Unfilled")}</p>
                 <p className="text-lg font-black text-amber-700">{scheduleSummary.unfilled}</p>
               </div>
-              <div className="rounded-md bg-card px-3 py-2 text-foreground">
-                <p className="text-xs uppercase text-foreground/90">{t("Available Pool")}</p>
+              <div className="rounded-md bg-card px-3 py-2">
+                <p className="text-xs uppercase">{t("Available Pool")}</p>
                 <p className="text-lg font-black">{scheduleSummary.availableCount}</p>
               </div>
-              <div className="rounded-md bg-slate-100 px-3 py-2 text-foreground dark:bg-slate-700/40">
-                <p className="text-xs uppercase text-foreground/90">{t("Locked")}</p>
-                <p className="text-lg font-black text-foreground">{scheduleSummary.lockedCount}</p>
+              <div className="rounded-md bg-muted px-3 py-2">
+                <p className="text-xs uppercase">{t("Locked")}</p>
+                <p className="text-lg font-black">{scheduleSummary.lockedCount}</p>
               </div>
             </div>
           )}
 
           <div className="no-print sticky top-14 z-10 panel border-2 border-strawberry-100 p-3">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <label className="text-sm">
                 <span className="mb-1 block font-semibold">{t("Date")}</span>
                 <select value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
@@ -1088,19 +1101,11 @@ export function AdminDashboard() {
                 </select>
               </label>
               <label className="text-sm">
-                <span className="mb-1 block font-semibold">{t("Module")}</span>
-                <select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value as ModuleFilter)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
-                  <option value="ALL">{t("All")}</option>
-                  <option value="BOOTH">{t("Booth")}</option>
-                  <option value="HALL">{t("Hall")}</option>
-                </select>
-              </label>
-              <label className="text-sm">
                 <span className="mb-1 block font-semibold">{t("Shift Type")}</span>
                 <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)} className="w-full rounded-md border border-strawberry-200 px-2 py-2">
                   <option value="ALL">{t("All")}</option>
                   {[...new Set(data.shifts.map((s) => s.shiftType))].map((st) => (
-                    <option key={st} value={st}>{t(formatShiftTypeLabel(st))}</option>
+                    <option key={st} value={st}>{t(shiftShortLabel(st))}</option>
                   ))}
                 </select>
               </label>
@@ -1118,7 +1123,7 @@ export function AdminDashboard() {
             <div className="mt-3 grid gap-3 md:grid-cols-4">
               <input
                 className="rounded-md border border-strawberry-200 px-2 py-2 text-sm md:col-span-2"
-                placeholder={t("Search volunteer name/email/phone")}
+                placeholder={t("Search by Volunteer ID, name, email, phone")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -1134,13 +1139,13 @@ export function AdminDashboard() {
             </div>
             <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Assign")}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Fill")}</span>
                 <div className="flex flex-wrap gap-2">
-                  <button disabled={loading || !shiftId} onClick={runAutoAssign} className="rounded-md bg-leaf-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                    {t("Run Auto-Assign")}
+                  <button disabled={loading || !shiftId || scheduleLocked} onClick={() => void runAutoAssign()} className="rounded-md bg-leaf-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                    {t("Run Autofill")}
                   </button>
                   <button
-                    disabled={loading || !shiftId}
+                    disabled={loading || !shiftId || scheduleLocked}
                     onClick={() => void runBulkAction("auto_assign_unfilled")}
                     className="rounded-md border border-leaf-500 px-3 py-2 text-sm font-semibold text-leaf-700 disabled:opacity-60"
                   >
@@ -1153,21 +1158,21 @@ export function AdminDashboard() {
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Locks")}</span>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    disabled={loading || !shiftId}
+                    disabled={loading || !shiftId || scheduleLocked}
                     onClick={() => void runBulkAction("clear_unlocked")}
                     className="rounded-md border border-amber-400 px-3 py-2 text-sm font-semibold text-amber-800 disabled:opacity-60"
                   >
                     {t("Clear Unlocked")}
                   </button>
                   <button
-                    disabled={loading || !shiftId}
+                    disabled={loading || !shiftId || scheduleLocked}
                     onClick={() => void runBulkAction("lock_all")}
                     className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
                   >
                     {t("Lock All")}
                   </button>
                   <button
-                    disabled={loading || !shiftId}
+                    disabled={loading || !shiftId || scheduleLocked}
                     onClick={() => void runBulkAction("unlock_all")}
                     className="rounded-md border border-strawberry-300 px-3 py-2 text-sm disabled:opacity-60"
                   >
@@ -1178,32 +1183,74 @@ export function AdminDashboard() {
 
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("View")}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => void load()} className="rounded-md border border-strawberry-300 px-3 py-2 text-sm">
-                    {t("Refresh")}
-                  </button>
-                </div>
+                <button onClick={() => void load()} className="rounded-md border border-strawberry-300 px-3 py-2 text-sm">
+                  {t("Refresh")}
+                </button>
               </div>
 
-              <div className="flex flex-col gap-1 rounded-lg border border-dashed border-strawberry-300 p-2 md:ml-auto">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Demo data")}</span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    disabled={loading}
-                    onClick={() => void seedTestWorkers()}
-                    className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
-                  >
-                    {t("Add Test Workers")}
-                  </button>
-                  <button
-                    disabled={loading}
-                    onClick={() => void clearTestWorkers()}
-                    className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
-                  >
-                    {t("Remove Test Workers")}
-                  </button>
+              {isAdmin && (
+                <div className="flex flex-col gap-1 rounded-lg border border-dashed border-strawberry-300 p-2 md:ml-auto">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Demo data")}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      disabled={loading}
+                      onClick={() => void seedTestWorkers()}
+                      className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
+                    >
+                      {t("Add Test Workers")}
+                    </button>
+                    <button
+                      disabled={loading}
+                      onClick={() => void clearTestWorkers()}
+                      className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                    >
+                      {t("Remove Test Workers")}
+                    </button>
+                  </div>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {autoWarnings.length > 0 && (
+            <div className="panel border-amber-300 bg-amber-50 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-black text-amber-900">⚠ {t("Autofill placed these volunteers with warnings — confirm or reassign:")}</p>
+                <button onClick={() => setAutoWarnings([])} className="rounded border border-amber-400 px-2 py-0.5 text-xs text-amber-900">{t("Dismiss")}</button>
               </div>
+              <ul className="mt-2 space-y-1 text-sm text-amber-950">
+                {autoWarnings.map((w) => (
+                  <li key={`${w.volunteerId}:${w.roleName}`}>
+                    <button className="underline" onClick={() => setSelectedVolunteerId(w.volunteerId)}>
+                      {w.volunteerCode}
+                    </button>{" "}
+                    ({w.volunteerName}) → {t(w.roleName)}: {w.warnings.join("; ")} — {t("confirm?")}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="panel p-3">
+            <p className="text-xs font-black uppercase tracking-wide text-foreground/60">{t("Shift notes (visible to supervisors & admins)")}</p>
+            <div className="mt-1 space-y-1 text-sm">
+              {currentShiftNotes.map((n) => (
+                <p key={n.id} className="rounded-md bg-sunny-100 px-2 py-1">
+                  {n.text} <span className="text-xs text-foreground/50">— {n.author}, {format(new Date(n.createdAt), "MMM d HH:mm")}</span>
+                </p>
+              ))}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={shiftNoteText}
+                onChange={(e) => setShiftNoteText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void saveShiftNote()}
+                placeholder={t("Add a note about this shift…")}
+                className="flex-1 rounded-md border border-strawberry-200 px-2 py-2 text-sm"
+              />
+              <button onClick={() => void saveShiftNote()} className="rounded-md border border-strawberry-300 px-3 py-2 text-sm font-semibold">
+                {t("Add Note")}
+              </button>
             </div>
           </div>
 
@@ -1221,43 +1268,36 @@ export function AdminDashboard() {
               <div className="grid gap-4 xl:grid-cols-[280px_1fr_300px]">
                 <div className="panel xl:col-span-3 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground/85">{t("Role Legend")}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-foreground/85">{t("Position Legend")}</p>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="rounded border border-strawberry-200 bg-card px-2 py-0.5">
-                        {t("Filter:")} {selectedRoleFilterIds.length === 0 ? t("All roles") : `${selectedRoleFilterIds.length} ${t("selected")}`}
+                        {t("Filter:")} {selectedRoleFilterIds.length === 0 ? t("All positions") : `${selectedRoleFilterIds.length} ${t("selected")}`}
                       </span>
                       {selectedRoleFilterIds.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedRoleFilterIds([])}
-                          className="rounded border border-strawberry-300 px-2 py-0.5"
-                        >
+                        <button type="button" onClick={() => setSelectedRoleFilterIds([])} className="rounded border border-strawberry-300 px-2 py-0.5">
                           {t("Clear")}
                         </button>
                       )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {displayedRoles.map((role) => (
+                    {displayedRoles.map((r) => (
                       <button
-                        key={role.id}
+                        key={r.id}
                         type="button"
                         onClick={() => {
-                          setInspectorRoleId(role.id);
-                          toggleRoleFilter(role.id);
+                          setInspectorRoleId(r.id);
+                          toggleRoleFilter(r.id);
                         }}
-                        className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs ${
-                          selectedRoleFilterIds.includes(role.id)
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                          selectedRoleFilterIds.includes(r.id)
                             ? "border-leaf-500 bg-leaf-200/40 ring-1 ring-leaf-500"
-                            : inspectorRoleId === role.id
+                            : inspectorRoleId === r.id
                               ? "border-cyan-500 bg-cyan-100/30"
                               : "border-strawberry-200 bg-card"
                         }`}
                       >
-                        <span className="rounded-full bg-strawberry-100 px-1.5 py-0.5 text-xs font-semibold text-foreground dark:bg-strawberry-100/35">
-                          {roleCodeMap.get(role.id) || "R?"}
-                        </span>
-                        <span>{t(role.name)}</span>
+                        {t(r.name)}
                       </button>
                     ))}
                   </div>
@@ -1266,113 +1306,101 @@ export function AdminDashboard() {
                 <aside className="panel no-print p-3">
                   <h3 className="font-semibold">{t("Available Pool")}</h3>
                   <p className="mb-2 text-xs text-foreground/85">
-                    {t("Drag into a green role, red roles are blocked.")}
-                    {selectedRoleFilterIds.length > 0 ? ` ${t("Pool is filtered by selected role chips.")}` : ""}
+                    {t("Sorted by legacy score, then sign-up time. Drag onto a green position; red positions are blocked by a hard rule.")}
                   </p>
                   <input
                     className="mb-2 w-full rounded-md border border-strawberry-200 px-2 py-2 text-xs"
-                    placeholder={t("Search available pool")}
+                    placeholder={t("Search pool")}
                     value={poolSearch}
                     onChange={(e) => setPoolSearch(e.target.value)}
                   />
-                  {selectedRoleFilterIds.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-1">
-                      {selectedRoleFilterIds.map((roleId) => {
-                        const role = displayedRoles.find((r) => r.id === roleId);
-                        if (!role) return null;
-                        return (
-                          <button
-                            key={roleId}
-                            type="button"
-                            onClick={() => toggleRoleFilter(roleId)}
-                            className="rounded-full border border-leaf-500 bg-leaf-200/40 px-2 py-0.5 text-[11px]"
-                          >
-                            {roleCodeMap.get(roleId) || "R?"} {t(role.name)} ×
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="space-y-2">
+                  <div className="max-h-[40rem] space-y-2 overflow-auto">
                     {availablePool.map((vol) => (
                       <div key={vol.id} onClick={() => setSelectedVolunteerId(vol.id)}>
                         <PoolCard
                           volunteer={vol}
                           selected={selectedVolunteerId === vol.id}
-                          volunteerCode={volunteerCodeMap.get(vol.id) || `V-${vol.id.slice(-4).toUpperCase()}`}
                           fitSummary={getVolunteerFit(vol.id, selectedRoleFilterIds).summary}
                           reliability={reliabilityInfo(reliabilityByVolunteer.get(vol.id))}
+                          flagCount={(flagsByVolunteer.get(vol.id) ?? []).length}
                         />
                       </div>
                     ))}
                     {availablePool.length === 0 && (
-                      <p className="text-xs text-foreground/90">
-                        {t("No available volunteers after filters.")}
-                      </p>
+                      <p className="text-xs text-foreground/90">{t("No available volunteers after filters.")}</p>
                     )}
-                  </div>
-                  <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-2 text-foreground dark:bg-amber-700/25 dark:text-amber-100">
-                    <p className="text-xs font-semibold text-amber-900 dark:text-amber-100">
-                      {t("Needs Attention")}{roleForAttention ? `: ${t(roleForAttention.name)}` : ""}
-                    </p>
-                    <div className="mt-2 space-y-1 text-xs">
-                      {needsAttention.length === 0 ? (
-                        <p className="text-amber-900 dark:text-amber-100">{t("No blockers detected in current pool.")}</p>
-                      ) : (
-                        needsAttention.map((item) => (
-                          <button
-                            key={item.volunteer.id}
-                            type="button"
-                            onClick={() => setSelectedVolunteerId(item.volunteer.id)}
-                            className="w-full rounded border border-amber-200 bg-card px-2 py-1 text-left text-foreground"
-                          >
-                            <p className="font-semibold">
-                              {item.volunteer.firstName} {item.volunteer.lastName}
-                            </p>
-                            <p className="text-amber-900 dark:text-amber-100">{item.reasons.slice(0, 2).map((r) => t(r)).join(" • ")}</p>
-                          </button>
-                        ))
-                      )}
-                    </div>
                   </div>
                 </aside>
 
                 <div className="columns-1 gap-2 md:columns-2 xl:columns-3">
-                  {displayedRoles.map((role) => {
-                    const roleAssigned = assigned.filter((a) => a.roleId === role.id);
-                    const target = roleTargets.find((r) => r.roleId === role.id)?.target || 0;
+                  {displayedRoles.map((r) => {
+                    const roleAssigned = assigned.filter((a) => a.roleId === r.id);
+                    const target = roleTargets.find((rt) => rt.roleId === r.id)?.target || 0;
                     return (
                       <RoleColumn
-                        key={role.id}
-                        role={role}
+                        key={r.id}
+                        role={r}
                         count={roleAssigned.length}
                         target={target}
-                        selected={inspectorRoleId === role.id}
+                        selected={inspectorRoleId === r.id}
                         onSelect={() => {
-                          setInspectorRoleId(role.id);
-                          toggleRoleFilter(role.id);
+                          setInspectorRoleId(r.id);
+                          toggleRoleFilter(r.id);
                         }}
-                        roleCode={roleCodeMap.get(role.id) || role.name}
-                        dropState={getRoleDropState(role.id)}
+                        dropState={getRoleDropState(r.id)}
                       >
-                        {roleAssigned.map((a) => (
-                          <button
-                            key={a.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedVolunteerId(a.volunteerId);
-                              setInspectorRoleId(role.id);
-                            }}
-                            className={`flex w-full items-center justify-between rounded border border-strawberry-100 bg-card px-2 py-1 text-left text-xs text-foreground ${selectedVolunteerId === a.volunteerId ? "ring-1 ring-leaf-500" : ""}`}
-                          >
-                            <span>
-                              {a.volunteer.firstName} {a.volunteer.lastName}
-                              {a.confirmationStatus === "CONFIRMED" && <span title={t("Confirmed via text")} className="ml-1 text-emerald-600">✓</span>}
-                              {a.confirmationStatus === "CANCELLED" && <span title={t("Cancelled via text")} className="ml-1 font-bold text-rose-600">✕</span>}
-                            </span>
-                            {a.forceAssigned && <span className="text-xs text-orange-700 dark:text-orange-200">{t("FORCED")}</span>}
-                          </button>
-                        ))}
+                        {roleAssigned.map((a) => {
+                          const vol = data.volunteers.find((v) => v.id === a.volunteerId);
+                          const hard = vol ? hardReasonsFor(vol, r) : [];
+                          const soft = vol ? softWarningsFor(vol, r) : [];
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedVolunteerId(a.volunteerId);
+                                setInspectorRoleId(r.id);
+                              }}
+                              className={`flex w-full items-center justify-between gap-1 rounded border px-2 py-1 text-left text-xs ${
+                                hard.length > 0 ? "border-red-400 bg-red-50" : "border-strawberry-100 bg-card"
+                              } ${selectedVolunteerId === a.volunteerId ? "ring-1 ring-leaf-500" : ""}`}
+                            >
+                              <span className="truncate">
+                                <span className="font-mono font-bold text-strawberry-700">{vol?.volunteerCode ?? a.volunteerId.slice(-6)}</span>
+                                <span className="ml-1 text-foreground/70">{a.volunteer.firstName}</span>
+                                {a.confirmationStatus === "CONFIRMED" && <span title={t("Confirmed via text")} className="ml-1 text-emerald-600">✓</span>}
+                                {a.confirmationStatus === "CANCELLED" && <span title={t("Cancelled via text")} className="ml-1 font-bold text-rose-600">✕</span>}
+                              </span>
+                              <span className="flex shrink-0 items-center gap-1">
+                                {hard.length > 0 && (
+                                  <span className="rounded bg-red-500 px-1 py-0.5 text-[9px] font-black text-white" title={hard.join("; ")}>
+                                    {t("RULE")}
+                                  </span>
+                                )}
+                                {hard.length === 0 && soft.length > 0 && (
+                                  <span className="rounded bg-amber-300 px-1 py-0.5 text-[9px] font-black text-amber-950" title={soft.join("; ")}>
+                                    ⚠
+                                  </span>
+                                )}
+                                {a.locked && <span title={t("Locked")}>🔒</span>}
+                                {!scheduleLocked && (
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void removeAssignment(a.id);
+                                    }}
+                                    className="rounded border border-strawberry-200 px-1 text-[10px] text-strawberry-700"
+                                    title={t("Remove from this position")}
+                                  >
+                                    ✕
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </RoleColumn>
                     );
                   })}
@@ -1384,130 +1412,84 @@ export function AdminDashboard() {
                     <p className="mt-2 text-xs text-foreground/90">{t("Select a volunteer card to inspect eligibility and today's assignments.")}</p>
                   ) : (
                     <div className="mt-2 space-y-2 text-xs">
+                      <p className="font-mono text-sm font-black text-strawberry-700">{selectedVolunteer.volunteerCode}</p>
                       <p className="font-semibold">
                         {selectedVolunteer.firstName} {selectedVolunteer.lastName}
+                        <button onClick={() => setDetailVolunteerId(selectedVolunteer.id)} className="ml-2 rounded border border-strawberry-200 px-1.5 py-0.5 text-[10px] underline">
+                          {t("full info")}
+                        </button>
+                        <button onClick={() => setNotesVolunteerId(selectedVolunteer.id)} className="ml-1 rounded border border-strawberry-200 px-1.5 py-0.5 text-[10px] underline">
+                          {t("notes")} ({(notesByVolunteer.get(selectedVolunteer.id) ?? []).length})
+                        </button>
                       </p>
-                      <p className="rounded bg-strawberry-100 px-2 py-1 text-xs font-semibold text-foreground dark:bg-strawberry-100/35">
-                        {volunteerCodeMap.get(selectedVolunteer.id) || `V-${selectedVolunteer.id.slice(-4).toUpperCase()}`}
+                      <p className="rounded border border-leaf-300 bg-leaf-200/30 px-2 py-1">
+                        {t("Legacy score:")} <strong>{selectedVolunteer.yearsExperience}</strong> · {t("signed up")} {format(new Date(selectedVolunteer.createdAt), "MMM d HH:mm")}
                       </p>
-                      <p>{selectedVolunteer.email}</p>
-                      <p>{selectedVolunteer.phone}</p>
-                      <p className="rounded border border-leaf-300 bg-leaf-200/30 px-2 py-1 text-xs text-foreground">
-                        {getVolunteerFit(selectedVolunteer.id).summary}
-                      </p>
-                      <div className="rounded border border-strawberry-100 bg-strawberry-50 p-2">
-                        <p className="font-semibold">{t("Acknowledgements")}</p>
-                        <p>{t("Standing:")} {selectedVolunteer.acknowledgement?.standingWalking ? t("Yes") : t("No")}</p>
-                        <p>{t("Heavy lift:")} {selectedVolunteer.acknowledgement?.heavyLift50 ? t("Yes") : t("No")}</p>
-                        <p>{t("Cash:")} {selectedVolunteer.acknowledgement?.cashHandling ? t("Yes") : t("No")}</p>
-                        <p>{t("Outdoor:")} {selectedVolunteer.acknowledgement?.outdoorSun ? t("Yes") : t("No")}</p>
-                      </div>
-                      <div className="rounded border border-strawberry-100 p-2">
-                        <p className="font-semibold">{t("Reliability")}</p>
-                        {(() => {
-                          const info = reliabilityInfo(reliabilityByVolunteer.get(selectedVolunteer.id));
-                          return (
-                            <p className="mt-1">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
-                                <span aria-hidden>{info.emoji}</span> {t(info.label)}
-                              </span>
-                              {info.assigned > 0
-                                ? ` · ${info.attended} ${t("in")} / ${info.noShows} ${t("no-show")}${info.excused > 0 ? ` / ${info.excused} ${t("excused")}` : ""} ${t("of")} ${info.assigned}`
-                                : ` · ${t("no shifts yet")}`}
-                            </p>
-                          );
-                        })()}
-                        {selectedVolunteer.adminNotes && (
-                          <p className="mt-1">
-                            <span className="font-semibold">{t("Note:")}</span> {selectedVolunteer.adminNotes}
-                          </p>
-                        )}
-                      </div>
+                      {(flagsByVolunteer.get(selectedVolunteer.id) ?? []).length > 0 && (
+                        <div className="rounded border border-amber-300 bg-amber-50 p-2">
+                          <p className="font-bold text-amber-900">{t("Sign-up flags")}</p>
+                          {(flagsByVolunteer.get(selectedVolunteer.id) ?? []).map((f) => (
+                            <p key={f.id} className="text-amber-950">⚑ {f.detail ?? f.type}</p>
+                          ))}
+                        </div>
+                      )}
                       {selectedRole && (
                         <div className="rounded border border-leaf-300 bg-leaf-200/40 p-2">
-                          <p className="font-semibold">{t("Selected Role")}</p>
+                          <p className="font-semibold">{t("Selected Position")}</p>
                           <p>{t(selectedRole.name)}</p>
-                          <p className="mt-1">{t("Requires training:")} {selectedRole.requiresTraining ? t("Yes") : t("No")}</p>
-                          <p>{t("Requires approval:")} {selectedRole.requiresApproval ? t("Yes") : t("No")}</p>
-                          <p>{t("Required gender:")} {selectedRole.requiredGender ? t(selectedRole.requiredGender) : t("Any")}</p>
+                          {selectedRole.physicalDemands && <p className="mt-0.5 text-foreground/70">{t(selectedRole.physicalDemands)}</p>}
+                          <p className="mt-1">{t("Minimum age:")} {selectedRole.minAge > 0 ? selectedRole.minAge : t("none")}</p>
+                          {selectedRole.liftLimitLbs > 0 && <p>{t("Lifting:")} {selectedRole.liftLimitLbs} lbs</p>}
+                          <p>{t("Gender:")} {selectedRole.requiredGender ? (selectedRole.requiredGender === "FEMALE" ? t("Female only") : t("Male only")) : t("Any")}</p>
                         </div>
                       )}
-                      {selectedRole && (
-                        <div className={`rounded border p-2 ${eligibilityReasons.length === 0 ? "border-green-300 bg-green-50 text-green-900 dark:bg-green-700/30 dark:text-green-100" : "border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-700/30 dark:text-amber-100"}`}>
-                          <p className="font-semibold">{t("Eligibility Check")}</p>
-                          {eligibilityReasons.length === 0 ? (
-                            <p className="text-green-700 dark:text-green-100">{t("Eligible for selected role and shift.")}</p>
-                          ) : (
-                            <ul className="list-disc pl-4 text-amber-900 dark:text-amber-100">
-                              {eligibilityReasons.map((r) => (
-                                <li key={r}>{t(r)}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      )}
-                      <div className="rounded border border-strawberry-100 p-2">
-                        <p className="mb-1 font-semibold">{t("Assignments this date")}</p>
-                        {selectedVolunteerAssignmentsToday.length === 0 ? (
-                          <p>{t("None")}</p>
-                        ) : (
-                          selectedVolunteerAssignmentsToday.map((a) => (
-                            <p key={a.id}>
-                              {t(a.shift.label)} - {t(a.role.name)}
-                            </p>
-                          ))
-                        )}
-                      </div>
-                      {selectedRole && (
+                      {selectedRole && (() => {
+                        const elig = roleEligibilityMap.get(`${selectedVolunteer.id}:${selectedRole.id}`);
+                        return (
+                          <div className={`rounded border p-2 ${elig?.eligible ? (elig.soft.length ? "border-amber-300 bg-amber-50" : "border-green-300 bg-green-50") : "border-red-300 bg-red-50"}`}>
+                            <p className="font-semibold">{t("Placement Check")}</p>
+                            {!elig || elig.eligible ? (
+                              elig && elig.soft.length > 0 ? (
+                                <ul className="list-disc pl-4 text-amber-900">
+                                  {elig.soft.map((w) => (
+                                    <li key={w}>{t(w)} — {t("allowed, please confirm")}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-green-700">{t("Good to go for this position and shift.")}</p>
+                              )
+                            ) : (
+                              <ul className="list-disc pl-4 text-red-800">
+                                {elig.hard.map((rr) => (
+                                  <li key={rr}>{t(rr)}</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {selectedRole && !scheduleLocked && (
                         <button
                           type="button"
                           onClick={() => void assignSelectedFromInspector()}
                           className="w-full rounded-md bg-strawberry-500 px-3 py-2 text-xs font-semibold text-white"
                         >
-                          {t("Assign Selected Volunteer to")} {t(selectedRole.name)}
+                          {t("Assign to")} {t(selectedRole.name)}
                         </button>
-                      )}
-                      {selectedRole && (
-                        <button
-                          type="button"
-                          onClick={() => void loadSuggestionsForRole()}
-                          className="w-full rounded-md border border-leaf-500 px-3 py-2 text-xs font-semibold text-leaf-700"
-                        >
-                          {t("Suggest Replacements for")} {t(selectedRole.name)}
-                        </button>
-                      )}
-                      {selectedRole && roleSuggestions.length > 0 && (
-                        <div className="rounded border border-leaf-300 bg-leaf-200/30 p-2">
-                          <p className="font-semibold">{t("Top Suggestions")}</p>
-                          <div className="mt-1 space-y-1">
-                            {roleSuggestions.map((s) => (
-                              <button
-                                key={s.volunteerId}
-                                type="button"
-                                onClick={() => setSelectedVolunteerId(s.volunteerId)}
-                                className="w-full rounded border border-leaf-200 bg-card px-2 py-1 text-left text-xs text-foreground"
-                              >
-                                <p className="font-semibold">{s.name}</p>
-                                <p className="text-xs">{t("Score:")} {s.score.toFixed(1)}</p>
-                                <p className="text-xs">{s.reasons.join(" • ")}</p>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
                       )}
                     </div>
                   )}
-                  <div className="mt-4 rounded-md border border-strawberry-100 bg-strawberry-50/80 p-2 text-foreground dark:bg-strawberry-100/25">
+                  <div className="mt-4 rounded-md border border-strawberry-100 bg-strawberry-50/70 p-2">
                     <p className="text-xs font-semibold">{t("Recent Activity")}</p>
                     <div className="mt-2 max-h-44 space-y-1 overflow-auto text-xs">
                       {data.auditLogs.length === 0 ? (
-                        <p className="text-foreground/90">{t("No audit entries yet.")}</p>
+                        <p>{t("No audit entries yet.")}</p>
                       ) : (
                         data.auditLogs.slice(0, 20).map((log) => (
-                          <div key={log.id} className="rounded border border-strawberry-100 bg-card px-2 py-1 text-foreground">
+                          <div key={log.id} className="rounded border border-strawberry-100 bg-card px-2 py-1">
                             <p className="font-semibold">{log.action}</p>
-                            <p className="text-foreground/85">{log.entityType} {log.details ? `• ${log.details}` : ""}</p>
-                            <p className="text-foreground/85">{format(new Date(log.createdAt), "MMM d HH:mm")}</p>
+                            <p className="text-foreground/70">{log.entityType} {log.details ? `• ${log.details}` : ""}</p>
+                            <p className="text-foreground/70">{format(new Date(log.createdAt), "MMM d HH:mm")}</p>
                           </div>
                         ))
                       )}
@@ -1524,75 +1506,69 @@ export function AdminDashboard() {
         <section className="panel p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-bold">{t("Volunteer Roster")}</h2>
+              <h2 className="text-lg font-bold">{t("Volunteer Database")}</h2>
               <p className="text-xs text-foreground/70">
-                {t("Showing")} {roster.length} {t("of")} {data.volunteers.length} {t("verified volunteers")}
+                {t("Showing")} {roster.length} {t("of")} {data.volunteers.length} · {t("Volunteer ID first — tap a row for personal info")}
               </p>
             </div>
             <input
               className="w-full max-w-xs rounded-md border border-strawberry-200 px-3 py-2 text-sm"
-              placeholder={t("Search name / email / phone")}
+              placeholder={t("Search ID / name / email / phone")}
               value={rosterSearch}
               onChange={(e) => setRosterSearch(e.target.value)}
             />
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-strawberry-100 text-left text-xs uppercase tracking-wide text-foreground/60">
+                  <th className="p-2">{t("Volunteer ID")}</th>
                   <th className="p-2">{t("Name")}</th>
-                  <th className="p-2">{t("Contact")}</th>
-                  <th className="p-2">{t("Gender")}</th>
-                  <th className="p-2 text-center">{t("Exp")}</th>
+                  <th className="p-2 text-center">{t("Legacy")}</th>
                   <th className="p-2">{t("Tier")}</th>
-                  <th className="p-2">{t("Can do")}</th>
+                  <th className="p-2">{t("Flags")}</th>
                   <th className="p-2 text-center">{t("Avail")}</th>
                   <th className="p-2 text-center">{t("Assigned")}</th>
                   <th className="p-2">{t("Reliability")}</th>
-                  <th className="p-2">{t("Notes (admin only)")}</th>
+                  <th className="p-2">{t("Notes")}</th>
                 </tr>
               </thead>
               <tbody>
                 {roster.map((v) => {
-                  const ack = v.acknowledgement;
-                  const caps: Array<[string, boolean]> = [
-                    [t("Stand"), !!ack?.standingWalking],
-                    [t("Heavy"), !!ack?.heavyLift50],
-                    [t("Cash"), !!ack?.cashHandling],
-                    [t("Outdoor"), !!ack?.outdoorSun],
-                  ];
+                  const flags = flagsByVolunteer.get(v.id) ?? [];
+                  const notes = notesByVolunteer.get(v.id) ?? [];
+                  const tier = seniorityTier(v.yearsExperience);
                   return (
                     <tr key={v.id} className="border-b border-strawberry-50 align-top">
+                      <td className="p-2">
+                        <button onClick={() => setDetailVolunteerId(v.id)} className="font-mono text-xs font-black text-strawberry-700 underline">
+                          {v.volunteerCode ?? v.id.slice(-6)}
+                        </button>
+                      </td>
                       <td className="p-2 font-semibold">
-                        {v.firstName} {v.lastName}
+                        <button onClick={() => setDetailVolunteerId(v.id)} className="text-left hover:underline">
+                          {v.firstName} {v.lastName}
+                        </button>
+                        {v.firstTimeVolunteer && <span className="ml-1 rounded bg-sunny-100 px-1.5 py-0.5 text-[10px] font-bold text-sunny-600">{t("1st year")}</span>}
                       </td>
-                      <td className="p-2 text-xs text-foreground/80">
-                        <div>{v.email}</div>
-                        <div>{v.phone}</div>
-                      </td>
-                      <td className="p-2 text-xs capitalize">{v.gender.replace(/_/g, " ").toLowerCase()}</td>
                       <td className="p-2 text-center tabular-nums">{v.yearsExperience}</td>
                       <td className="p-2">
-                        {(() => {
-                          const tier = seniorityTier(v.yearsExperience);
-                          return (
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tier.className}`}>
-                              <span aria-hidden>{tier.emoji}</span> {t(tier.label)}
-                            </span>
-                          );
-                        })()}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tier.className}`}>
+                          <span aria-hidden>{tier.emoji}</span> {t(tier.label)}
+                        </span>
                       </td>
                       <td className="p-2">
-                        <div className="flex flex-wrap gap-1">
-                          {caps.map(([label, on]) => (
-                            <span
-                              key={label}
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${on ? "bg-leaf-200 text-leaf-700" : "bg-muted text-foreground/40"}`}
-                            >
-                              {label}
-                            </span>
-                          ))}
-                        </div>
+                        {flags.length === 0 ? (
+                          <span className="text-xs text-foreground/40">—</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {flags.map((f) => (
+                              <span key={f.id} className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-950" title={f.detail ?? ""}>
+                                {f.type.replaceAll("_", " ")}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="p-2 text-center tabular-nums">{volunteerCounts.availByVolunteer.get(v.id) ?? 0}</td>
                       <td className="p-2 text-center tabular-nums">{volunteerCounts.assignByVolunteer.get(v.id) ?? 0}</td>
@@ -1600,36 +1576,26 @@ export function AdminDashboard() {
                         {(() => {
                           const info = reliabilityInfo(reliabilityByVolunteer.get(v.id));
                           return (
-                            <div className="flex flex-col gap-0.5">
-                              <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
-                                <span aria-hidden>{info.emoji}</span> {t(info.label)}
-                              </span>
-                              {info.assigned > 0 && (
-                                <span className="text-[10px] text-foreground/60">
-                                  {info.attended} {t("in")} · {info.noShows} {info.noShows === 1 ? t("no-show") : t("no-shows")}
-                                  {info.excused > 0 ? ` · ${info.excused} ${t("excused")}` : ""}
-                                </span>
-                              )}
-                            </div>
+                            <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${info.className}`}>
+                              <span aria-hidden>{info.emoji}</span> {t(info.label)}
+                            </span>
                           );
                         })()}
                       </td>
                       <td className="p-2">
-                        <input
-                          defaultValue={v.adminNotes ?? ""}
-                          onBlur={(e) => {
-                            if (e.target.value.trim() !== (v.adminNotes ?? "").trim()) void saveNote(v.id, e.target.value);
-                          }}
-                          placeholder={t("Add a note…")}
-                          className="w-44 rounded-md border border-strawberry-200 bg-background px-2 py-1 text-xs"
-                        />
+                        <button onClick={() => setNotesVolunteerId(v.id)} className="rounded-md border border-strawberry-200 px-2 py-1 text-xs font-semibold">
+                          {notes.length > 0 ? `📝 ${notes.length}` : t("+ note")}
+                        </button>
+                        {notes.some((n) => n.category === "DO_NOT_SCHEDULE") && (
+                          <span className="ml-1 rounded bg-strawberry-500 px-1.5 py-0.5 text-[10px] font-black text-white">{t("DNS")}</span>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
                 {roster.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="p-4 text-center text-foreground/60">
+                    <td colSpan={9} className="p-4 text-center text-foreground/60">
                       {t("No volunteers match your search.")}
                     </td>
                   </tr>
@@ -1648,8 +1614,8 @@ export function AdminDashboard() {
               <h2 className="text-lg font-bold">{t("Training & Approvals")}</h2>
               <p className="text-xs text-foreground/70">
                 {gatedRoles.length === 0
-                  ? t("No roles currently require training or approval.")
-                  : `${t("Roles needing sign-off:")} ${gatedRoles.map((r) => t(r.name)).join(", ")}`}
+                  ? t("No positions currently require training or approval.")
+                  : `${t("Positions needing sign-off:")} ${gatedRoles.map((r) => t(r.name)).join(", ")}`}
               </p>
             </div>
             {gatedRoles.length > 0 && (
@@ -1667,10 +1633,10 @@ export function AdminDashboard() {
                     {data.volunteers.map((v) => (
                       <tr key={v.id} className="border-b border-strawberry-50">
                         <td className="p-2 font-semibold">
-                          {v.firstName} {v.lastName}
+                          <span className="font-mono text-xs font-bold text-strawberry-700">{v.volunteerCode}</span> {v.firstName} {v.lastName}
                         </td>
                         {gatedRoles.map((r) => {
-                          const trained = data.trainings.find((t) => t.volunteerId === v.id && t.roleId === r.id)?.trained || false;
+                          const trained = data.trainings.find((tr) => tr.volunteerId === v.id && tr.roleId === r.id)?.trained || false;
                           const approved = data.approvals.find((a) => a.volunteerId === v.id && a.roleId === r.id)?.approved || false;
                           return (
                             <td key={r.id} className="p-2">
@@ -1701,7 +1667,29 @@ export function AdminDashboard() {
         );
       })()}
 
-      {message && <p className="rounded-md bg-strawberry-50/80 px-3 py-2 text-sm text-foreground dark:bg-strawberry-100/25">{message}</p>}
+      {tab === "supervisor" && data && (
+        <SupervisorTab
+          data={data}
+          canPublish={isSupervisorPlus}
+          onOpenShift={(id) => {
+            setShiftId(id);
+            setTab("schedule");
+          }}
+          onPublished={(id) => {
+            setCommsPrefillShiftId(id);
+            setTab("comms");
+          }}
+          reload={load}
+        />
+      )}
+
+      {tab === "hall" && <HallLogTab />}
+
+      {tab === "comms" && data && <CommsTab data={data} prefillShiftId={commsPrefillShiftId} canSend={isSupervisorPlus} />}
+
+      {tab === "analytics" && data && isAdmin && <AnalyticsTab data={data} />}
+
+      {message && <p className="rounded-md bg-strawberry-50 px-3 py-2 text-sm">{message}</p>}
     </div>
   );
 }

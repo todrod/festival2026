@@ -1,22 +1,20 @@
-import { Gender, ShiftType, VerificationMethod } from "@prisma/client";
+import { FlagType, Gender, LanguagePreference, ShiftType, VerificationMethod } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { volunteerCodeFor } from "@/lib/festival";
 
 const TEST_EMAIL_DOMAIN = "festival.test.local";
 const TEST_ACTOR = "admin:seed-test-workers";
 
 const F = Gender.FEMALE;
 const M = Gender.MALE;
-const NB = Gender.NON_BINARY;
-const P = Gender.PREFER_NOT_TO_SAY;
 
 type Character = { name: string; gender: Gender };
 
-// Character-accurate genders so gender-restricted roles (Berry Girl, Sticker
-// Persons) and the volunteer demographics read sensibly in a demo.
+// Character-accurate genders so gender-restricted positions (Berry Girl,
+// Sticker Persons) and the volunteer demographics read sensibly in a demo.
 const CHARACTERS: Character[] = [
-  // Disney
   { name: "Mickey Mouse", gender: M },
   { name: "Minnie Mouse", gender: F },
   { name: "Donald Duck", gender: M },
@@ -25,7 +23,6 @@ const CHARACTERS: Character[] = [
   { name: "Elsa Arendelle", gender: F },
   { name: "Anna Arendelle", gender: F },
   { name: "Kristoff Bjorgman", gender: M },
-  { name: "Olaf Snowman", gender: NB },
   { name: "Moana Waialiki", gender: F },
   { name: "Maui Demigod", gender: M },
   { name: "Ariel Triton", gender: F },
@@ -48,8 +45,6 @@ const CHARACTERS: Character[] = [
   { name: "Woody Pride", gender: M },
   { name: "Buzz Lightyear", gender: M },
   { name: "Bo Peep", gender: F },
-  { name: "Remy Ratatouille", gender: M },
-  // Star Wars
   { name: "Luke Skywalker", gender: M },
   { name: "Leia Organa", gender: F },
   { name: "Han Solo", gender: M },
@@ -61,7 +56,6 @@ const CHARACTERS: Character[] = [
   { name: "ObiWan Kenobi", gender: M },
   { name: "Ahsoka Tano", gender: F },
   { name: "Din Djarin", gender: M },
-  { name: "Grogu Child", gender: P },
   { name: "Lando Calrissian", gender: M },
   { name: "Rose Tico", gender: F },
   { name: "Cassian Andor", gender: M },
@@ -70,7 +64,6 @@ const CHARACTERS: Character[] = [
   { name: "BoKatan Kryze", gender: F },
   { name: "Chewbacca Wookiee", gender: M },
   { name: "Wedge Antilles", gender: M },
-  // Celebrities
   { name: "Zendaya Coleman", gender: F },
   { name: "Tom Holland", gender: M },
   { name: "Chris Pratt", gender: M },
@@ -104,33 +97,21 @@ const CHARACTERS: Character[] = [
 ];
 
 // Availability archetypes so not everyone is free for every shift.
-type Profile = "FULL" | "DAY" | "NIGHT" | "HALL" | "BOOTH";
+type Profile = "FULL" | "DAY" | "NIGHT" | "SETUP";
 const PROFILE_SEQUENCE: Profile[] = [
-  "FULL", "DAY", "BOOTH", "DAY", "HALL", "NIGHT", "FULL", "DAY", "BOOTH", "HALL", "DAY", "NIGHT",
+  "FULL", "DAY", "SETUP", "DAY", "NIGHT", "FULL", "DAY", "SETUP", "NIGHT", "DAY", "NIGHT", "FULL",
 ];
-
-const AM_HALL: ShiftType[] = [
-  ShiftType.HALL_EARLY_SETUP,
-  ShiftType.HALL_BERRY_HULLERS,
-  ShiftType.HALL_BERRY_PRODUCTION,
-  ShiftType.HALL_UNIFORMS_AM,
-  ShiftType.HALL_HEAVY_HALL,
-];
-const PM_HALL: ShiftType[] = [ShiftType.HALL_UNIFORMS_PM, ShiftType.HALL_BUCKET_WASHERS];
-const ALL_HALL: ShiftType[] = [...AM_HALL, ...PM_HALL, ShiftType.HALL_DRIVERS];
 
 function profileShiftTypes(p: Profile): ShiftType[] {
   switch (p) {
     case "FULL":
-      return [ShiftType.BOOTH_DAY, ShiftType.BOOTH_NIGHT, ...ALL_HALL];
+      return [ShiftType.BOOTH_SETUP, ShiftType.BOOTH_DAY, ShiftType.BOOTH_NIGHT, ShiftType.BOOTH_PACKUP];
     case "DAY":
-      return [ShiftType.BOOTH_DAY, ...AM_HALL];
+      return [ShiftType.BOOTH_DAY, ShiftType.BOOTH_PACKUP];
     case "NIGHT":
-      return [ShiftType.BOOTH_NIGHT, ...PM_HALL];
-    case "HALL":
-      return ALL_HALL;
-    case "BOOTH":
-      return [ShiftType.BOOTH_DAY, ShiftType.BOOTH_NIGHT];
+      return [ShiftType.BOOTH_NIGHT];
+    case "SETUP":
+      return [ShiftType.BOOTH_SETUP, ShiftType.BOOTH_DAY];
   }
 }
 
@@ -161,9 +142,9 @@ export async function POST() {
 
     const roles = await prisma.role.findMany();
     const supervisorRole = roles.find((r) => r.key === "SUPERVISOR");
-    // Booth roles usable as ranked preferences (skip supervisor + manual-only).
+    // Booth positions usable as ranked preferences (skip supervisor + info-only).
     const boothPrefRoles = roles.filter(
-      (r) => r.module === "BOOTH" && !r.manualOnly && !r.requiresTraining && !r.requiresApproval,
+      (r) => r.module === "BOOTH" && !r.manualOnly && !r.infoOnly && !r.requiresTraining && !r.requiresApproval,
     );
 
     const dateList = [...new Set(shifts.map((s) => s.date.getTime()))].sort((a, b) => a - b);
@@ -177,6 +158,7 @@ export async function POST() {
     const preferenceRows: Array<{ volunteerId: string; shiftId: string; roleId: string; rank: number }> = [];
     const trainingRows: Array<{ volunteerId: string; roleId: string; trained: boolean }> = [];
     const approvalRows: Array<{ volunteerId: string; roleId: string; approved: boolean }> = [];
+    const flagRows: Array<{ volunteerId: string; type: FlagType; detail: string }> = [];
 
     let supervisorCount = 0;
 
@@ -190,15 +172,18 @@ export async function POST() {
       const profile = PROFILE_SEQUENCE[i % PROFILE_SEQUENCE.length];
       const types = new Set(profileShiftTypes(profile));
 
-      // Varied capabilities so acknowledgement checks actually filter people.
+      // Varied capabilities so requirement checks actually filter people.
       const standing = h(i, 1) < 92;
-      const heavy = h(i, 2) < 45;
+      const lifting: 0 | 25 | 50 = h(i, 2) < 45 ? 50 : h(i, 2) < 75 ? 25 : 0;
       const cash = h(i, 3) < 52;
       const outdoor = h(i, 4) < 62;
       const years = h(i, 5) % 16;
       const willingAnyBoothDay = types.has(ShiftType.BOOTH_DAY) && h(i, 6) < 55;
       const willingAnyBoothNight = types.has(ShiftType.BOOTH_NIGHT) && h(i, 10) < 45;
-      const birthYear = 1965 + (h(i, 9) % 40); // everyone comfortably 18+
+      // A few teens (16–17) so age flags show up in demos; everyone else adult.
+      const isTeen = i % 17 === 3;
+      const birthYear = isTeen ? 2010 : 1965 + (h(i, 9) % 40);
+      const parentConsent = isTeen && h(i, 14) < 50;
 
       // Available on ~78% of days that match the profile's shift types.
       const availableDayTimes = new Set(dateList.filter((_, d) => h(i, 200 + d) < 78));
@@ -206,21 +191,31 @@ export async function POST() {
         (s) => types.has(s.shiftType) && availableDayTimes.has(s.date.getTime()),
       );
 
-      const isSupervisor = !!supervisorRole && years >= 9 && h(i, 7) < 55;
+      const isSupervisor = !!supervisorRole && !isTeen && years >= 9 && h(i, 7) < 55;
       const supervisorApproved = isSupervisor && h(i, 8) < 80;
 
       const volunteer = await prisma.volunteer.create({
         data: {
           firstName,
           lastName,
-          dob: new Date(Date.UTC(birthYear, (i % 12), ((i * 7) % 27) + 1)),
+          dob: new Date(Date.UTC(birthYear, i % 12, ((i * 7) % 27) + 1)),
           ageConfirmed: true,
           email,
           phone: `555-01${String((i + 10) % 90).padStart(2, "0")}`,
+          address: `${100 + i} Festival Lane, Plant City, FL`,
           emergencyContactName: "Demo Contact",
           emergencyContactPhone: `555-99${String((i + 10) % 90).padStart(2, "0")}`,
           gender,
-          language: h(i, 12) < 15 ? "Spanish" : "English",
+          language:
+            h(i, 12) < 15
+              ? LanguagePreference.SPANISH
+              : h(i, 12) < 25
+                ? LanguagePreference.BOTH
+                : LanguagePreference.ENGLISH,
+          firstTimeVolunteer: years === 0,
+          orientationRsvp: years === 0 ? (h(i, 15) < 60 ? "WILL_ATTEND" : "WILL_NOT_ATTEND") : null,
+          parentConsent,
+          emergencyOptIn: h(i, 16) < 25,
           textOk: h(i, 13) < 70,
           emailOk: true,
           yearsExperience: years,
@@ -231,9 +226,10 @@ export async function POST() {
           verifiedAt: new Date(),
           acknowledgement: {
             create: {
-              age18Plus: true,
+              age18Plus: !isTeen,
               standingWalking: standing,
-              heavyLift50: heavy,
+              heavyLift50: lifting >= 50,
+              liftingCapacityLbs: lifting,
               cashHandling: cash,
               outdoorSun: outdoor,
               liabilityAcknowledged: true,
@@ -241,34 +237,39 @@ export async function POST() {
             },
           },
         },
-        select: { id: true },
+        select: { id: true, seq: true },
       });
+      await prisma.volunteer.update({
+        where: { id: volunteer.id },
+        data: { volunteerCode: volunteerCodeFor(volunteer.seq) },
+      });
+
+      if (isTeen && !parentConsent) {
+        flagRows.push({
+          volunteerId: volunteer.id,
+          type: FlagType.AGE_16_18_NO_CONSENT,
+          detail: "Age 16–17 at festival start, no parent consent",
+        });
+      }
 
       for (const s of availShifts) {
         availabilityRows.push({ volunteerId: volunteer.id, shiftId: s.id });
       }
 
-      // Rank up to two booth roles this person is actually eligible for, so
-      // preference-based scoring in auto-assign has something to work with.
+      // Rank up to three booth positions this person prefers (the sign-up flow
+      // collects 1st/2nd/3rd choice), applied across their available shifts.
       const eligibleBooth = boothPrefRoles.filter(
-        (r) =>
-          (!r.requiredGender || r.requiredGender === gender) &&
-          (!r.requiresStanding || standing) &&
-          (!r.requiresHeavyLift || heavy) &&
-          (!r.requiresCash || cash) &&
-          (!r.requiresOutdoor || outdoor),
+        (r) => !r.requiredGender || r.requiredGender === gender,
       );
       const prefRoles: string[] = [];
       if (eligibleBooth.length > 0) {
         prefRoles.push(eligibleBooth[i % eligibleBooth.length].id);
-        if (eligibleBooth.length > 1) {
-          const second = eligibleBooth[(i + 1 + h(i, 11)) % eligibleBooth.length].id;
-          if (second !== prefRoles[0]) prefRoles.push(second);
-        }
+        const second = eligibleBooth[(i + 1 + h(i, 11)) % eligibleBooth.length].id;
+        if (!prefRoles.includes(second)) prefRoles.push(second);
+        const third = eligibleBooth[(i + 3 + h(i, 17)) % eligibleBooth.length].id;
+        if (!prefRoles.includes(third) && prefRoles.length < 3) prefRoles.push(third);
       }
-      const boothAvailShifts = availShifts.filter(
-        (s) => s.shiftType === ShiftType.BOOTH_DAY || s.shiftType === ShiftType.BOOTH_NIGHT,
-      );
+      const boothAvailShifts = availShifts.filter((s) => s.shiftType !== ShiftType.BOOTH_SETUP);
       for (const s of boothAvailShifts) {
         prefRoles.forEach((roleId, idx) => {
           preferenceRows.push({ volunteerId: volunteer.id, shiftId: s.id, roleId, rank: idx + 1 });
@@ -293,6 +294,9 @@ export async function POST() {
     }
     if (approvalRows.length > 0) {
       await prisma.approval.createMany({ data: approvalRows, skipDuplicates: true });
+    }
+    if (flagRows.length > 0) {
+      await prisma.volunteerFlag.createMany({ data: flagRows, skipDuplicates: true });
     }
 
     await prisma.auditLog.create({

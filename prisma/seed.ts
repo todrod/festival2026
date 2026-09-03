@@ -1,6 +1,15 @@
-import { PrismaClient, RoleModule, ShiftType } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { format } from "date-fns";
-import { FESTIVAL_END, FESTIVAL_NAME, FESTIVAL_START, ROLE_SEEDS, SHIFT_SEEDS, atDayTime, festivalDates } from "../src/lib/festival";
+import {
+  FESTIVAL_END,
+  FESTIVAL_NAME,
+  FESTIVAL_START,
+  PACKUP_DATE,
+  ROLE_SEEDS,
+  SHIFT_SEEDS,
+  atDayTime,
+  festivalDates,
+} from "../src/lib/festival";
 
 const prisma = new PrismaClient();
 
@@ -13,11 +22,17 @@ async function fullWipe() {
   await prisma.availability.deleteMany();
   await prisma.training.deleteMany();
   await prisma.approval.deleteMany();
+  await prisma.volunteerFlag.deleteMany();
+  await prisma.adminNote.deleteMany();
   await prisma.volunteerAcknowledgement.deleteMany();
   await prisma.volunteer.deleteMany();
+  await prisma.shiftNote.deleteMany();
+  await prisma.schedulePublish.deleteMany();
   await prisma.shift.deleteMany();
   await prisma.role.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.hallAttendance.deleteMany();
+  await prisma.messageLog.deleteMany();
 }
 
 async function main() {
@@ -28,27 +43,20 @@ async function main() {
   }
 
   const existingEvent = await prisma.event.findFirst();
-  const windowMatches = existingEvent && existingEvent.startDate.getTime() === FESTIVAL_START.getTime();
-  if (!forceReseed) {
-    console.log(
-      existingEvent
-        ? windowMatches
-          ? "Syncing festival calendar in place (volunteers and signups preserved)."
-          : "Festival window changed — rebuilding the calendar (volunteers and signups preserved)."
-        : "First-time seed — creating the festival calendar.",
-    );
-  }
 
-  // Roles: upsert by key so role ids are stable — trainings, approvals,
-  // preferences, and assignments that reference roles all survive.
+  // Positions: upsert by key so ids are stable — trainings, approvals,
+  // preferences, and assignments that reference positions all survive.
   const roleByKey = new Map<string, string>();
   for (const role of ROLE_SEEDS) {
     const data = {
       name: role.name,
       module: role.module,
       description: role.description,
+      physicalDemands: role.physicalDemands ?? "",
       requiresStanding: !!role.requiresStanding,
       requiresHeavyLift: !!role.requiresHeavyLift,
+      liftLimitLbs: role.liftLimitLbs ?? 0,
+      minAge: role.minAge ?? 16,
       requiresCash: !!role.requiresCash,
       requiresOutdoor: !!role.requiresOutdoor,
       requiresTraining: !!role.requiresTraining,
@@ -56,6 +64,11 @@ async function main() {
       requiredGender: role.requiredGender ?? null,
       manualOnly: !!role.manualOnly,
       isRelief: !!role.isRelief,
+      infoOnly: !!role.infoOnly,
+      contactName: role.contactName ?? null,
+      contactPhone: role.contactPhone ?? null,
+      contactNote: role.contactNote ?? null,
+      urgent: !!role.urgent,
     };
     const created = await prisma.role.upsert({
       where: { key: role.key },
@@ -65,67 +78,75 @@ async function main() {
     roleByKey.set(role.key, created.id);
   }
 
+  // Remove positions no longer in the catalog (cascades their prefs/assignments).
+  const staleRoles = await prisma.role.findMany({
+    where: { key: { notIn: ROLE_SEEDS.map((r) => r.key) } },
+    select: { id: true, key: true },
+  });
+  if (staleRoles.length > 0) {
+    await prisma.role.deleteMany({ where: { id: { in: staleRoles.map((r) => r.id) } } });
+    console.log(`Removed ${staleRoles.length} stale position(s): ${staleRoles.map((r) => r.key).join(", ")}`);
+  }
+
   // Event: one row — update it in place, or create it the first time.
   const event = existingEvent
     ? await prisma.event.update({
         where: { id: existingEvent.id },
-        data: { name: FESTIVAL_NAME, startDate: FESTIVAL_START, endDate: FESTIVAL_END },
+        data: { name: FESTIVAL_NAME, startDate: FESTIVAL_START, endDate: PACKUP_DATE },
       })
     : await prisma.event.create({
-        data: { name: FESTIVAL_NAME, startDate: FESTIVAL_START, endDate: FESTIVAL_END },
+        data: { name: FESTIVAL_NAME, startDate: FESTIVAL_START, endDate: PACKUP_DATE },
       });
 
   const dates = festivalDates();
-  const validDateTimes = new Set(dates.map((d) => d.getTime()));
+  const validKeys = new Set<string>();
 
-  // Remove only shifts whose date is no longer in the festival window. This
-  // cascades the availability/preferences/assignments tied to those stale dates
-  // (which are meaningless once the date is gone) but leaves everything for
-  // dates that still exist untouched.
-  const allShifts = await prisma.shift.findMany({ select: { id: true, date: true } });
-  const staleShiftIds = allShifts.filter((s) => !validDateTimes.has(s.date.getTime())).map((s) => s.id);
-  if (staleShiftIds.length > 0) {
-    await prisma.shift.deleteMany({ where: { id: { in: staleShiftIds } } });
-    console.log(`Removed ${staleShiftIds.length} shift(s) for dates outside the current window.`);
-  }
-
-  // Shifts + role targets: upsert by their natural unique keys. Shifts on dates
-  // that already exist are updated in place, so their availability/assignments
-  // are preserved.
-  for (const date of dates) {
-    for (const shift of SHIFT_SEEDS) {
+  for (const seed of SHIFT_SEEDS) {
+    const seedDates = seed.days === "packup" ? [PACKUP_DATE] : dates;
+    for (const date of seedDates) {
+      validKeys.add(`${date.getTime()}:${seed.shiftType}`);
       const shiftData = {
         eventId: event.id,
-        module: shift.module,
-        label: shift.label,
-        startAt: atDayTime(date, shift.startHour, shift.startMinute),
-        endAt: atDayTime(date, shift.endHour, shift.endMinute),
+        module: seed.module,
+        label: seed.label,
+        startAt: atDayTime(date, seed.startHour, seed.startMinute),
+        endAt: atDayTime(date, seed.endHour, seed.endMinute),
         arrivalAt:
-          shift.arrivalHour === undefined ? null : atDayTime(date, shift.arrivalHour, shift.arrivalMinute ?? 0),
-        conflictStartAt: atDayTime(date, shift.conflictStartHour, shift.conflictStartMinute),
-        conflictEndAt: atDayTime(date, shift.conflictEndHour, shift.conflictEndMinute),
+          seed.arrivalHour === undefined ? null : atDayTime(date, seed.arrivalHour, seed.arrivalMinute ?? 0),
+        conflictStartAt: atDayTime(date, seed.conflictStartHour, seed.conflictStartMinute),
+        conflictEndAt: atDayTime(date, seed.conflictEndHour, seed.conflictEndMinute),
       };
       const createdShift = await prisma.shift.upsert({
-        where: { date_shiftType: { date, shiftType: shift.shiftType } },
+        where: { date_shiftType: { date, shiftType: seed.shiftType } },
         update: shiftData,
-        create: { date, shiftType: shift.shiftType, ...shiftData },
+        create: { date, shiftType: seed.shiftType, ...shiftData },
       });
 
-      if (shift.module === RoleModule.BOOTH && (shift.shiftType === ShiftType.BOOTH_DAY || shift.shiftType === ShiftType.BOOTH_NIGHT)) {
-        for (const boothRole of ROLE_SEEDS.filter((r) => r.module === RoleModule.BOOTH && typeof r.boothTarget === "number")) {
-          const roleId = roleByKey.get(boothRole.key)!;
-          await prisma.roleTarget.upsert({
-            where: { shiftId_roleId: { shiftId: createdShift.id, roleId } },
-            update: { target: boothRole.boothTarget! },
-            create: { shiftId: createdShift.id, roleId, target: boothRole.boothTarget! },
-          });
-        }
+      for (const roleSeed of ROLE_SEEDS) {
+        const target = roleSeed.targets?.[seed.shiftType];
+        if (typeof target !== "number") continue;
+        const roleId = roleByKey.get(roleSeed.key)!;
+        await prisma.roleTarget.upsert({
+          where: { shiftId_roleId: { shiftId: createdShift.id, roleId } },
+          update: { target },
+          create: { shiftId: createdShift.id, roleId, target },
+        });
       }
     }
   }
 
+  // Remove shifts that no longer exist in the calendar (stale dates or types).
+  const allShifts = await prisma.shift.findMany({ select: { id: true, date: true, shiftType: true } });
+  const staleShiftIds = allShifts
+    .filter((s) => !validKeys.has(`${s.date.getTime()}:${s.shiftType}`))
+    .map((s) => s.id);
+  if (staleShiftIds.length > 0) {
+    await prisma.shift.deleteMany({ where: { id: { in: staleShiftIds } } });
+    console.log(`Removed ${staleShiftIds.length} shift(s) outside the current calendar.`);
+  }
+
   console.log(
-    `Seed synced for festival dates ${format(FESTIVAL_START, "MMM d")} - ${format(FESTIVAL_END, "MMM d, yyyy")}`,
+    `Seed synced for festival dates ${format(FESTIVAL_START, "MMM d")} - ${format(FESTIVAL_END, "MMM d, yyyy")} + pack-up ${format(PACKUP_DATE, "MMM d")}`,
   );
 }
 

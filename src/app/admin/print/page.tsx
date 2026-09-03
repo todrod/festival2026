@@ -62,7 +62,7 @@ export default async function PrintPage({
           {format(activeShift.date, "EEEE, MMM d, yyyy")} - {activeShift.label}
         </p>
         <div className="mt-3 rounded-md border border-strawberry-100 bg-strawberry-50/80 p-3 text-xs text-foreground dark:bg-strawberry-100/25">
-          <p className="mb-2 font-semibold uppercase tracking-wide text-foreground/85">Role Legend</p>
+          <p className="mb-2 font-semibold uppercase tracking-wide text-foreground/85">Position Legend</p>
           <div className="flex flex-wrap gap-2">
             {roleEntries.map((role) => (
               <span key={role.id} className="inline-flex items-center gap-2 rounded-full border border-strawberry-200 bg-card px-2 py-1">
@@ -89,6 +89,7 @@ export default async function PrintPage({
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr>
+                  <th className="border border-strawberry-200 p-2 text-left">Volunteer ID</th>
                   <th className="border border-strawberry-200 p-2 text-left">Volunteer</th>
                   <th className="border border-strawberry-200 p-2 text-left">Phone</th>
                   <th className="border border-strawberry-200 p-2 text-left">Check-In</th>
@@ -97,6 +98,7 @@ export default async function PrintPage({
               <tbody>
                 {list.map((item) => (
                   <tr key={item.id}>
+                    <td className="border border-strawberry-100 p-2 font-mono text-xs">{item.volunteer.volunteerCode ?? ""}</td>
                     <td className="border border-strawberry-100 p-2">
                       {item.volunteer.firstName} {item.volunteer.lastName}
                     </td>

@@ -51,14 +51,14 @@ export async function POST(req: Request) {
     }
 
     if (action === "auto_assign_unfilled") {
-      const assignments = await autoAssignShift(shiftId);
+      const { assignments, warnings } = await autoAssignShift(shiftId);
       await logAdminAction({
         action,
         entityType: "Assignment",
         shiftId,
-        details: `count:${assignments.length}`,
+        details: `count:${assignments.length} warnings:${warnings.length}`,
       });
-      return NextResponse.json({ ok: true, action, count: assignments.length });
+      return NextResponse.json({ ok: true, action, count: assignments.length, warnings });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

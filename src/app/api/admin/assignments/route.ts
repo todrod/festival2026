@@ -62,7 +62,13 @@ export async function POST(req: Request) {
       details: `${parsed.volunteerId}:${parsed.roleId}${forceAssign ? ":FORCE" : ""}`,
     });
 
-    return NextResponse.json({ ok: true, assignment, warning: !eligible.ok ? eligible.reason : null });
+    const softWarnings = eligible.warnings ?? [];
+    return NextResponse.json({
+      ok: true,
+      assignment,
+      warning: !eligible.ok ? eligible.reason : softWarnings.length > 0 ? softWarnings.join(" · ") : null,
+      warnings: softWarnings,
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to save assignment" }, { status: 400 });

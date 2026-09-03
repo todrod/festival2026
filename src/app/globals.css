@@ -1,35 +1,43 @@
 @import "tailwindcss";
 
+/* Warm festival palette — reds, yellows, greens, matching the bulletin ad.
+   Token names are kept from the previous theme so components keep working. */
 :root {
-  --background: #152238;
-  --foreground: #f8fafc;
-  --card: #1b2b45;
-  --muted: #253654;
-  --strawberry-50: #22417a;
-  --strawberry-100: #355b9a;
-  --strawberry-300: #93c5fd;
-  --strawberry-500: #22c55e;
-  --strawberry-700: #38bdf8;
-  --strawberry-900: #f8fafc;
-  --leaf-200: #1f2937;
-  --leaf-500: #22c55e;
-  --leaf-700: #86efac;
+  --background: #fff8ec;
+  --foreground: #43242a;
+  --card: #fffdf8;
+  --muted: #fdeeda;
+  --strawberry-50: #fdeae6;
+  --strawberry-100: #f3cfc4;
+  --strawberry-300: #c0392f;
+  --strawberry-500: #d92637;
+  --strawberry-700: #a81e2c;
+  --strawberry-900: #7a1220;
+  --leaf-200: #ddefd6;
+  --leaf-500: #3f9142;
+  --leaf-700: #2e6b31;
+  --sunny-100: #fdf3d1;
+  --sunny-400: #f6c445;
+  --sunny-600: #d99a1b;
 }
 
 .dark {
-  --background: #122039;
-  --foreground: #f8fafc;
-  --card: #1a2b46;
-  --muted: #243758;
-  --strawberry-50: #22406f;
-  --strawberry-100: #36578d;
-  --strawberry-300: #93c5fd;
-  --strawberry-500: #22c55e;
-  --strawberry-700: #38bdf8;
-  --strawberry-900: #f8fafc;
-  --leaf-200: #1f2937;
-  --leaf-500: #22c55e;
-  --leaf-700: #86efac;
+  --background: #fff8ec;
+  --foreground: #43242a;
+  --card: #fffdf8;
+  --muted: #fdeeda;
+  --strawberry-50: #fdeae6;
+  --strawberry-100: #f3cfc4;
+  --strawberry-300: #c0392f;
+  --strawberry-500: #d92637;
+  --strawberry-700: #a81e2c;
+  --strawberry-900: #7a1220;
+  --leaf-200: #ddefd6;
+  --leaf-500: #3f9142;
+  --leaf-700: #2e6b31;
+  --sunny-100: #fdf3d1;
+  --sunny-400: #f6c445;
+  --sunny-600: #d99a1b;
 }
 
 @theme inline {
@@ -47,6 +55,9 @@
   --color-leaf-200: var(--leaf-200);
   --color-leaf-500: var(--leaf-500);
   --color-leaf-700: var(--leaf-700);
+  --color-sunny-100: var(--sunny-100);
+  --color-sunny-400: var(--sunny-400);
+  --color-sunny-600: var(--sunny-600);
 
   --font-sans: "Avenir Next", "Avenir", "Segoe UI", sans-serif;
 }
@@ -62,17 +73,15 @@ body {
 }
 
 body {
-  background: radial-gradient(circle at top right, #355b9a 0%, var(--background) 48%);
+  background:
+    radial-gradient(circle at top right, #fdf3d1 0%, transparent 42%),
+    radial-gradient(circle at bottom left, #fdeae6 0%, transparent 38%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
 }
 
-.dark body {
-  background: radial-gradient(circle at top right, #274a82 0%, var(--background) 52%);
-}
-
-/* Native <select> dropdowns: make the open option list legible (was rendering
-   light text on a light system background). */
+/* Native <select> dropdowns: keep the open option list legible. */
 select {
   color: var(--foreground);
 }
@@ -83,58 +92,39 @@ select optgroup {
   background-color: var(--card);
 }
 
+/* Admin area shares the warm theme with a slightly deeper shell. */
 .admin-theme {
-  --background: #122039;
-  --foreground: #f9fafb;
-  --card: #1a2b46;
-  --muted: #243758;
-  --strawberry-50: #22406f;
-  --strawberry-100: #36578d;
-  --strawberry-300: #93c5fd;
-  --strawberry-500: #22c55e;
-  --strawberry-700: #38bdf8;
-  --strawberry-900: #f9fafb;
-  --leaf-200: #1f2937;
-  --leaf-500: #22c55e;
-  --leaf-700: #86efac;
   color: var(--foreground);
 }
 
 .admin-theme-shell {
-  border-color: #36578d;
-  background: linear-gradient(180deg, #15233e 0%, #1a2b46 100%);
+  border-color: var(--strawberry-100);
+  background: linear-gradient(180deg, #fffdf8 0%, #fdf3e3 100%);
 }
 
 .admin-theme .panel {
-  border-color: #36578d;
+  border-color: var(--strawberry-100);
   background: var(--card);
-  box-shadow: none;
-}
-
-.dark .admin-theme {
-  --background: #122039;
-  --foreground: #f9fafb;
-  --card: #1a2b46;
-  --muted: #243758;
+  box-shadow: 0 4px 14px rgba(122, 18, 32, 0.06);
 }
 
 .panel {
   border-radius: 1rem;
   border: 1px solid var(--strawberry-100);
   background: var(--card);
-  box-shadow: 0 8px 24px rgba(20, 12, 14, 0.08);
+  box-shadow: 0 8px 24px rgba(122, 18, 32, 0.07);
 }
 
 .ops-surface {
   border: 1px solid var(--strawberry-100);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, black 6%) 0%, var(--card) 100%);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--strawberry-300) 35%, transparent 65%), 0 18px 36px rgba(2, 6, 23, 0.35);
+  background: linear-gradient(180deg, #fffdf8 0%, #fdf5e8 100%);
+  box-shadow: 0 10px 28px rgba(122, 18, 32, 0.08);
 }
 
 .ops-chip {
-  border: 1px solid var(--strawberry-100);
-  background: color-mix(in srgb, var(--muted) 80%, transparent 20%);
-  color: var(--foreground);
+  border: 1px solid var(--sunny-400);
+  background: var(--sunny-100);
+  color: var(--strawberry-900);
 }
 
 .ops-btn {
@@ -146,20 +136,26 @@ select optgroup {
 
 .ops-btn-primary {
   background: var(--strawberry-500);
-  color: #04140b;
+  border-color: var(--strawberry-700);
+  color: #ffffff;
 }
 
 .ops-btn-primary:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
 }
 
 .ops-btn-ghost {
-  background: color-mix(in srgb, var(--muted) 78%, transparent 22%);
-  color: var(--foreground);
+  background: var(--card);
+  color: var(--strawberry-900);
 }
 
 .ops-btn-ghost:hover {
   background: var(--strawberry-50);
+}
+
+/* Big, friendly tap targets for the public sign-up flow. */
+.tap-target {
+  min-height: 48px;
 }
 
 .print-only {

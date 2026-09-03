@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 450" role="img" aria-label="Saint Clement Catholic Church — Make Your Own Strawberry Shortcake Project">
+  <!-- Recreation of the parish shortcake project logo: church wordmark with
+       anchor-heart, bowl of strawberry shortcake, arced project title. -->
+  <defs>
+    <path id="arc1" d="M28 352 A200 200 0 0 0 372 352"/>
+    <path id="arc2" d="M46 388 A210 210 0 0 0 354 388"/>
+  </defs>
+  <g fill="#ec2027" font-family="'Trebuchet MS','Segoe UI',sans-serif">
+    <text x="118" y="66" font-size="44" font-weight="800">Saint</text>
+    <text x="88" y="108" font-size="44" font-weight="800">Clement</text>
+    <text x="96" y="136" font-size="22" font-weight="700" letter-spacing="1">CATHOLIC</text>
+    <text x="104" y="160" font-size="22" font-weight="700" letter-spacing="1">CHURCH</text>
+  </g>
+  <!-- anchor-heart -->
+  <g fill="none" stroke="#ec2027" stroke-width="9" stroke-linecap="round">
+    <path d="M258 76v58"/>
+    <path d="M240 84h36"/>
+    <circle cx="258" cy="66" r="9"/>
+    <path d="M258 200c-34-26-48-46-40-64 6-13 24-15 34-4"/>
+    <path d="M258 200c34-26 48-46 40-64-6-13-24-15-34-4 4-10 2-20-6-26"/>
+    <path d="M228 132c2 8 8 14 16 16"/>
+    <path d="M288 132c-2 8-8 14-16 16"/>
+  </g>
+  <g fill="#ec2027">
+    <circle cx="252" cy="168" r="3"/><circle cx="264" cy="168" r="3"/><circle cx="258" cy="178" r="3"/>
+    <circle cx="248" cy="180" r="3"/><circle cx="268" cy="180" r="3"/>
+  </g>
+  <!-- spoon -->
+  <path d="M296 150c14-32 34-56 44-52 10 4 0 34-22 66l-16 22z" fill="#2ba843" stroke="#fff" stroke-width="3"/>
+  <!-- bowl -->
+  <g>
+    <path d="M70 236c0 44 46 84 130 84s130-40 130-84z" fill="#2ba843"/>
+    <ellipse cx="200" cy="236" rx="130" ry="26" fill="#2ba843"/>
+    <ellipse cx="200" cy="236" rx="112" ry="19" fill="#ec2027"/>
+    <!-- berries in the filling -->
+    <g fill="#fff">
+      <path d="M150 228c6-8 16-8 20 0 3 6-2 14-10 14s-13-8-10-14z"/>
+      <path d="M192 230c6-8 16-8 20 0 3 6-2 14-10 14s-13-8-10-14z"/>
+      <path d="M234 228c6-8 16-8 20 0 3 6-2 14-10 14s-13-8-10-14z"/>
+    </g>
+    <g fill="#ec2027">
+      <circle cx="158" cy="234" r="1.8"/><circle cx="163" cy="230" r="1.8"/>
+      <circle cx="200" cy="236" r="1.8"/><circle cx="205" cy="232" r="1.8"/>
+      <circle cx="242" cy="234" r="1.8"/><circle cx="247" cy="230" r="1.8"/>
+    </g>
+    <!-- whipped cream -->
+    <path d="M96 226c22-22 60-34 104-34 40 0 76 10 100 26-8-10-6-22 6-26-18-10-30-8-38-2-22-12-58-18-92-14-38 4-68 18-80 36-2 6-2 10 0 14z" fill="#fff"/>
+    <path d="M120 210c30-14 82-18 120-6" fill="none" stroke="#2ba843" stroke-width="5" stroke-linecap="round"/>
+    <path d="M96 226c30-18 96-26 148-12" fill="none" stroke="#fff" stroke-width="1"/>
+  </g>
+  <!-- arced title -->
+  <g fill="#ec2027" font-family="'Trebuchet MS','Segoe UI',sans-serif" font-weight="800">
+    <text font-size="40"><textPath href="#arc1" startOffset="50%" text-anchor="middle">&#8220;Make Your Own&#8221;</textPath></text>
+    <text font-size="27"><textPath href="#arc2" startOffset="50%" text-anchor="middle">Strawberry Shortcake Project</textPath></text>
+  </g>
+</svg>

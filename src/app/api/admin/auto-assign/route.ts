@@ -9,14 +9,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { shiftId } = autoAssignSchema.parse(body);
-    const assignments = await autoAssignShift(shiftId);
+    const { assignments, warnings } = await autoAssignShift(shiftId);
     await logAdminAction({
       action: "auto_assign",
       entityType: "Assignment",
       shiftId,
-      details: `count:${assignments.length}`,
+      details: `count:${assignments.length} warnings:${warnings.length}`,
     });
-    return NextResponse.json({ ok: true, assignments });
+    return NextResponse.json({ ok: true, assignments, warnings });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Auto-assignment failed" }, { status: 400 });

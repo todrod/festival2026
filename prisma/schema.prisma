@@ -11,8 +11,6 @@ datasource db {
 enum Gender {
   FEMALE
   MALE
-  NON_BINARY
-  PREFER_NOT_TO_SAY
 }
 
 enum RoleModule {
@@ -21,16 +19,10 @@ enum RoleModule {
 }
 
 enum ShiftType {
+  BOOTH_SETUP
   BOOTH_DAY
   BOOTH_NIGHT
-  HALL_EARLY_SETUP
-  HALL_BERRY_HULLERS
-  HALL_BERRY_PRODUCTION
-  HALL_UNIFORMS_AM
-  HALL_UNIFORMS_PM
-  HALL_HEAVY_HALL
-  HALL_BUCKET_WASHERS
-  HALL_DRIVERS
+  BOOTH_PACKUP
 }
 
 enum AssignmentSource {
@@ -61,20 +53,63 @@ enum VerificationMethod {
   SMS
 }
 
+enum LanguagePreference {
+  ENGLISH
+  SPANISH
+  BOTH
+}
+
+enum OrientationRsvp {
+  WILL_ATTEND
+  WILL_NOT_ATTEND
+}
+
+// Silent sign-up flags — stored at submission time, never shown to the
+// volunteer and never blocking. Surfaced to schedulers/supervisors.
+enum FlagType {
+  GENDER_MISMATCH
+  AGE_UNDER_16
+  AGE_16_18_NO_CONSENT
+  LIFTING_MISMATCH
+  STANDING_MISMATCH
+}
+
+enum NoteCategory {
+  EXCELLENT
+  NEEDS_GUIDANCE
+  CALLOUT_HISTORY
+  PHYSICAL_LIMITATION
+  LANGUAGE_ONLY_SPANISH
+  VIP_RETURN
+  DO_NOT_SCHEDULE
+  GENERAL
+}
+
 model Volunteer {
   id                   String    @id @default(cuid())
+  // Sequential number behind the public Volunteer ID (SC2027000001).
+  seq                  Int       @unique @default(autoincrement())
+  volunteerCode        String?   @unique
   firstName            String
   lastName             String
   dob                  DateTime
   ageConfirmed         Boolean   @default(false)
   email                String
   phone                String
+  address              String    @default("")
   emergencyContactName String
   emergencyContactPhone String
   gender               Gender
-  language             String    @default("English")
+  language             LanguagePreference @default(ENGLISH)
+  firstTimeVolunteer   Boolean   @default(false)
+  orientationRsvp      OrientationRsvp?
+  parentConsent        Boolean   @default(false)
+  // Emergency/on-call volunteer opt-in: dates (yyyy-MM-dd) they can be called.
+  emergencyOptIn       Boolean   @default(false)
+  emergencyDates       String[]  @default([])
   textOk               Boolean   @default(false)
   emailOk              Boolean   @default(true)
+  // Legacy score: confirmed prior years of participation. Autofill tiebreaker.
   yearsExperience      Int       @default(0)
   willingAnyBoothDay   Boolean   @default(false)
   willingAnyBoothNight Boolean   @default(false)
@@ -92,6 +127,8 @@ model Volunteer {
   approvals       Approval[]
   assignments     Assignment[]
   reminderLogs    ReminderLog[]
+  flags           VolunteerFlag[]
+  notes           AdminNote[]
 
   @@index([lastName, firstName])
   @@unique([email])
@@ -103,6 +140,8 @@ model VolunteerAcknowledgement {
   age18Plus            Boolean
   standingWalking      Boolean
   heavyLift50          Boolean
+  // Declared lifting capacity in pounds: 0, 25, or 50.
+  liftingCapacityLbs   Int     @default(0)
   cashHandling         Boolean
   outdoorSun           Boolean
   liabilityAcknowledged Boolean
@@ -110,6 +149,35 @@ model VolunteerAcknowledgement {
   createdAt            DateTime @default(now())
 
   volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+}
+
+model VolunteerFlag {
+  id          String   @id @default(cuid())
+  volunteerId String
+  type        FlagType
+  positionKey String?
+  detail      String?
+  createdAt   DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId])
+}
+
+model AdminNote {
+  id          String       @id @default(cuid())
+  volunteerId String
+  category    NoteCategory @default(GENERAL)
+  text        String       @db.Text
+  author      String
+  // Private supervisor notes are only visible to their author (and admins can
+  // see they exist). Shared notes are visible to schedulers and up.
+  isPrivate   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@index([volunteerId, createdAt])
 }
 
 model Event {
@@ -140,6 +208,8 @@ model Shift {
   assignments  Assignment[]
   roleTargets  RoleTarget[]
   reminderLogs ReminderLog[]
+  notes        ShiftNote[]
+  publish      SchedulePublish?
 
   @@unique([date, shiftType])
   @@index([date, module])
@@ -151,8 +221,12 @@ model Role {
   name              String
   module            RoleModule
   description       String
+  physicalDemands   String   @default("")
   requiresStanding  Boolean  @default(false)
   requiresHeavyLift Boolean  @default(false)
+  // Lifting requirement in pounds (0 = none, 25 = some lifting, 50 = heavy).
+  liftLimitLbs      Int      @default(0)
+  minAge            Int      @default(16)
   requiresCash      Boolean  @default(false)
   requiresOutdoor   Boolean  @default(false)
   requiresTraining  Boolean  @default(false)
@@ -160,6 +234,12 @@ model Role {
   requiredGender    Gender?
   manualOnly        Boolean  @default(false)
   isRelief          Boolean  @default(false)
+  // Hall positions: informational only — volunteers call the contact person.
+  infoOnly          Boolean  @default(false)
+  contactName       String?
+  contactPhone      String?
+  contactNote       String?
+  urgent            Boolean  @default(false)
 
   preferences Preference[]
   trainings   Training[]
@@ -260,6 +340,62 @@ model RoleTarget {
   role  Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([shiftId, roleId])
+}
+
+// Scheduler note on a shift — visible to supervisors and admins.
+model ShiftNote {
+  id        String   @id @default(cuid())
+  shiftId   String
+  text      String   @db.Text
+  author    String
+  createdAt DateTime @default(now())
+
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([shiftId, createdAt])
+}
+
+// Supervisor final-publish: locks the schedule for that shift and kicks off
+// the communication workflow.
+model SchedulePublish {
+  id          String   @id @default(cuid())
+  shiftId     String   @unique
+  publishedBy String
+  publishedAt DateTime @default(now())
+
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+}
+
+// Hall daily attendance log — light-touch, no hard scheduling.
+model HallAttendance {
+  id        String   @id @default(cuid())
+  date      DateTime
+  name      String
+  groupSize Int      @default(1)
+  activity  String
+  hours     Float    @default(0)
+  notes     String?
+  author    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+// Every Communication-tab deploy (and automated sends) gets one row.
+model MessageLog {
+  id             String   @id @default(cuid())
+  kind           String
+  channel        String
+  audience       String
+  recipientCount Int
+  errorCount     Int      @default(0)
+  errors         String?  @db.Text
+  subject        String?
+  body           String   @db.Text
+  sentBy         String
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model AuditLog {

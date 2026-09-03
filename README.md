@@ -1,180 +1,93 @@
-# St. Clement Strawberry Festival Volunteer Scheduler
+# St. Clement "Make Your Own" Strawberry Shortcake Project — Volunteer System (2027)
 
-Production-ready MVP for volunteer signup and scheduling.
+Volunteer sign-up, scheduling, communications, and analytics for the parish
+shortcake booth (March 4–14, 2027, plus pack-up on the morning of March 15).
 
 ## Stack
 - Next.js 16 App Router + TypeScript
-- Tailwind CSS
-- Prisma ORM + MariaDB
+- Tailwind CSS (warm red/yellow/green festival theme, Tipper & Topper mascots)
+- Prisma ORM + Postgres (Vercel Postgres in production; `prisma db push` on deploy)
+- Twilio SMS (Messaging Service) + SMTP email (Mailpit locally, Resend in prod)
 - dnd-kit for drag/drop scheduling
 
-## Features Delivered
-- Public landing page + FAQ
-- Public volunteer multi-step signup wizard:
-  - Profile + 18+ DOB validation
-  - Availability by date/shift (Feb 26 - Mar 8, 2026)
-  - Ranked role preferences (drag reorder)
-  - Required acknowledgements + review
-  - Contact verification via Email OTP before account is usable (SMS wiring kept for later rollout)
-- Admin password login (cookie session)
-- Admin dashboard:
-  - Coverage cards
-  - Day detail scheduling board
-  - Drag/drop pool to role columns
-  - Auto-assignment for selected shift
-  - Force-assign with required reason support
-  - Training/approval toggles for Supervisor
-- Print center:
-  - Daily roster (check-in format)
-  - Emergency contact sheet
+## What's here (2027 redesign)
+- **Public sign-up** (5 plain-English steps, EN/ES): personal details incl.
+  address + language (English/Spanish/Both), first-time flag with orientation
+  RSVP (Jan 31, 2027, Cronin Hall, 5–7 PM), availability grid (Setup/Day/Night
+  per date + March 15 pack-up), ranked position choices (1st/2nd/3rd) with
+  inline requirement confirmation, emergency call-list opt-in with dates,
+  physical declaration (standing, lifting 0/25/50 lbs).
+- **Volunteer IDs**: `SC2027000001` format, generated at submission, primary
+  display identifier everywhere; personal info is behind a click.
+- **Silent sign-up flags** (never block, never shown to the volunteer): gender
+  mismatch, under 16, 16–18 without parent consent, lifting/standing mismatch.
+- **Position catalog**: booth positions with verbatim descriptions, physical
+  demands, min age 16, lift limits, gender restrictions; hall positions are
+  informational-only with call-to-sign-up contact pop-ups (Ted, Tim, Cathy,
+  Ana, Trish).
+- **Scheduler**: day/shift picker, position grid (needed/filled/unfilled),
+  autofill (legacy score DESC, then sign-up time ASC; hard rules block, soft
+  flags warn inline), drag-drop with hard-rule blocking + force override,
+  persistent RULE/⚠ badges on slots, shift notes.
+- **Supervisor**: full schedule across all dates, final-publish per shift
+  (locks assignments + routes into Communication pre-filled), unpublish,
+  shift notes visibility.
+- **Volunteer database**: flags, legacy score, categorized admin notes
+  (EXCELLENT … DO_NOT_SCHEDULE; DO_NOT_SCHEDULE excludes from autofill),
+  private supervisor notes visible only to their author.
+- **Hall Organization Panel**: daily attendance log (person or group + size +
+  activity + hours) with headcount summaries.
+- **Communication tab**: Schedule Notification / Reminder / Announcement to
+  all volunteers, a date, a shift, or one Volunteer ID; SMS + email preview
+  side by side; schedule emails highlight the recipient's own line (plain-text
+  fallback uses `>>>`); every deploy is logged with counts and errors.
+- **Analytics (admin only)**: shifts/hours per volunteer, callouts, no-shows,
+  filled-vs-needed by day, legacy distribution, flag frequency, hall totals,
+  top contributors, never-scheduled — all with CSV export.
+- Existing Twilio reminder flow (YES/NO confirmations), check-in mode, print
+  center, and Vercel cron reminders carried forward unchanged.
 
-## Scheduling Rules Enforced
-- No overlapping assignment windows on same date (using shift conflict windows)
-- Explicit Booth Day + Booth Night same-date block
-- Early Setup treated as HALL role
-- 18+ required at signup
-- Role capability checks (standing/heavy/cash/outdoor)
-- Supervisor assignment requires training + approval
-- Gender-restricted roles enforced (Berry Girl, Sticker Persons)
-- Relief role configured as universal capability role except Supervisor
-- Drivers set as manual-only
-- Only VERIFIED volunteers are eligible for scheduling and auto-assignment
+## Auth (additive roles)
+Password decides the role at `/admin` login (name is free text, used for note
+authorship and audit):
+- `ADMIN_PASSWORD` → Admin (everything, incl. Analytics + demo data)
+- `SUPERVISOR_PASSWORD` (optional) → Supervisor (publish, comms deploy, notes)
+- `SCHEDULER_PASSWORD` (optional) → Scheduler (scheduling; drafts comms, can't
+  deploy; locked out of published shifts)
 
-## Project Structure
-```text
-festivalapp/
-  prisma/
-    schema.prisma
-    seed.ts
-  src/
-    app/
-      page.tsx
-      signup/page.tsx
-      admin/page.tsx
-      admin/print/page.tsx
-      api/public/signup/route.ts
-      api/admin/*
-    components/
-      public/signup-wizard.tsx
-      admin/admin-dashboard.tsx
-      ui/theme-toggle.tsx
-    lib/
-      prisma.ts
-      auth.ts
-      festival.ts
-      validators.ts
+## Env
+```
+POSTGRES_PRISMA_URL=...
+POSTGRES_URL_NON_POOLING=...
+ADMIN_PASSWORD=...
+SUPERVISOR_PASSWORD=...        # optional
+SCHEDULER_PASSWORD=...         # optional
+ADMIN_SESSION_SECRET=...
+TWILIO_ACCOUNT_SID=...         # see SMS_SETUP.md
+TWILIO_API_KEY_SID=...
+TWILIO_API_KEY_SECRET=...
+TWILIO_MESSAGING_SERVICE_SID=...
+SMTP_HOST=... SMTP_PORT=... SMTP_USER=... SMTP_PASS=... SMTP_FROM=...  # see EMAIL_SETUP.md
+CRON_SECRET=...
 ```
 
-## Local Setup
-1. Install dependencies
-```bash
+## Local dev
+```
 npm install
-```
-
-2. Copy env file
-```bash
-cp .env.example .env
-```
-
-3. Run migrations + seed
-```bash
-npm run prisma:generate
-npm run prisma:migrate -- --name init
-npm run prisma:seed
-```
-
-4. Start app
-```bash
+npx prisma db push && npm run prisma:seed
 npm run dev
 ```
+Admin → Scheduler tab → "Add Test Workers" seeds 79 demo volunteers.
 
-Open `http://localhost:3000`.
+## Deploy notes (2027 schema)
+`vercel-build` runs `prisma db push --accept-data-loss` + seed. The 2027 schema
+**removes** the NON_BINARY / PREFER_NOT_TO_SAY gender values and the HALL_*
+shift types — a production database still holding 2026 rows with those values
+needs to be cleared (or those rows migrated) before the first 2027 deploy.
+The seed automatically rebuilds the 2027 calendar and position catalog and
+removes stale positions/shifts.
 
-## MariaDB on VPS (example)
-```sql
-CREATE DATABASE festival_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'festival_user'@'%' IDENTIFIED BY 'strong_password';
-GRANT ALL PRIVILEGES ON festival_app.* TO 'festival_user'@'%';
-FLUSH PRIVILEGES;
-```
-
-Set `DATABASE_URL` in `.env`:
-```env
-DATABASE_URL="mysql://festival_user:strong_password@YOUR_VPS_IP:3306/festival_app"
-```
-
-If remote DB access is restricted, use SSH tunnel:
-```bash
-ssh -N -L 3308:127.0.0.1:3306 root@YOUR_VPS_IP
-```
-Then use:
-```env
-DATABASE_URL="mysql://festival_user:strong_password@127.0.0.1:3308/festival_app"
-```
-
-## Admin Login
-- Set `ADMIN_PASSWORD` in `.env`
-- Visit `/admin` and sign in
-
-## Volunteer Verification (Email/SMS)
-- New signups are stored as `PENDING`
-- Volunteer must enter a 6-digit OTP to become `VERIFIED`
-- Only `VERIFIED` volunteers appear in scheduling pool/auto-assign
-
-### OTP Delivery
-- Email OTP uses SMTP if configured
-- SMS OTP uses Twilio if configured
-- If not configured, codes are logged to server console (dev fallback)
-
-Add to `.env`:
-```env
-OTP_PEPPER="random_secret"
-
-SMTP_HOST="smtp.example.com"
-SMTP_PORT="587"
-SMTP_USER="user@example.com"
-SMTP_PASS="password"
-SMTP_FROM="Festival App <no-reply@example.com>"
-
-TWILIO_ACCOUNT_SID="AC..."
-TWILIO_AUTH_TOKEN="..."
-TWILIO_FROM_NUMBER="+1..."
-```
-
-## Auto-Assignment Logic
-`autoAssignShift(shiftId)` in `src/lib/festival.ts`:
-- Reads role targets for selected shift
-- Candidate filtering:
-  - availability for shift
-  - no overlap / no booth day+night same date
-  - gender + acknowledgements + training/approval constraints
-- Scoring:
-  - role preference rank
-  - yearsExperience (seniority)
-  - stable deterministic tie-break
-- Fills constrained roles first, then remaining
-
-## Printing
-- Open `/admin/print`
-- Select shift
-- Browser print (`Cmd/Ctrl + P`)
-
-## Deployment Notes
-- Run `npm run build`
-- Run Prisma deploy on server:
-```bash
-npm run prisma:deploy
-npm run prisma:seed
-```
-- Start app with process manager (pm2/systemd)
-
-### GitHub Actions Deploy Workflow
-This repo includes `.github/workflows/deploy.yml` for automatic deploys on `main` push (or manual run).
-
-Required repository secrets:
-- `VPS_HOST` (example: `187.77.193.9`)
-- `VPS_USER` (example: `root`)
-- `VPS_PORT` (optional, defaults to `22`)
-- `VPS_SSH_KEY` (private key matching a key in server `authorized_keys`)
-- `VPS_APP_DIR` (absolute deploy path on VPS, example: `/var/www/festivalapp`)
-- `VPS_PM2_APP_NAME` (optional, defaults to `festivalapp`)
+## Brand assets
+`public/brand/` holds SVG recreations of the parish logo and the Tipper and
+Topper berry-people mascots. To use the original artwork instead, replace
+`logo.svg`, `tipper.svg`, and `topper.svg` with the source files (same names).

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { format } from "date-fns";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { getStaffSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
-    if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const session = await getStaffSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
     const date = url.searchParams.get("date");
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
       ...(shiftType ? { shiftType: shiftType as never } : {}),
     };
 
-    const [shifts, volunteers, roles, assignments, trainings, approvals] = await Promise.all([
+    const [shifts, volunteers, roles, assignments, trainings, approvals, flags, publishes] = await Promise.all([
       prisma.shift.findMany({ where: whereShift, orderBy: [{ date: "asc" }, { shiftType: "asc" }] }),
       prisma.volunteer.findMany({
         where: { status: "VERIFIED" },
@@ -34,6 +35,8 @@ export async function GET(req: Request) {
       }),
       prisma.training.findMany(),
       prisma.approval.findMany(),
+      prisma.volunteerFlag.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.schedulePublish.findMany(),
     ]);
 
     const availability = await prisma.availability.findMany({
@@ -42,6 +45,13 @@ export async function GET(req: Request) {
     });
 
     const roleTargets = await prisma.roleTarget.findMany({ where: { shiftId: { in: shifts.map((s) => s.id) } } });
+
+    const shiftNotes = await prisma.shiftNote.findMany({ orderBy: { createdAt: "desc" } });
+
+    // Notes: private notes are only visible to their author. Everything else is
+    // visible to any signed-in staff member (scheduler and up).
+    const allNotes = await prisma.adminNote.findMany({ orderBy: { createdAt: "desc" } });
+    const adminNotes = allNotes.filter((n) => !n.isPrivate || n.author === session.name);
 
     // If migration for AuditLog has not been applied yet, keep admin data usable.
     const auditLogs = await prisma.auditLog
@@ -60,7 +70,23 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ shifts, volunteers, roles, assignments, trainings, approvals, availability, roleTargets, coverage, auditLogs });
+    return NextResponse.json({
+      session,
+      shifts,
+      volunteers,
+      roles,
+      assignments,
+      trainings,
+      approvals,
+      availability,
+      roleTargets,
+      coverage,
+      auditLogs,
+      flags,
+      adminNotes,
+      shiftNotes,
+      publishes,
+    });
   } catch (err) {
     console.error("admin data route failed", err);
     return NextResponse.json({ error: "Failed to load admin data" }, { status: 500 });

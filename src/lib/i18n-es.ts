@@ -478,4 +478,135 @@ export const ES: Record<string, string> = {
   "Pick your days below. You can switch area to add shifts from the other area too.":
     "Elija sus días abajo. Puede cambiar de área para agregar turnos de la otra área también.",
   Area: "Área",
+
+  // --- 2027 Shortcake Project redesign ---
+  "“Make Your Own” Strawberry Shortcake Project": "Proyecto “Prepare su propio” Shortcake de Fresa",
+  "Staff Login": "Acceso del personal",
+  "Volunteer Sign-Up Open": "Inscripción de voluntarios abierta",
+  "Volunteer for St. Clement Make Your Own Strawberry Shortcake Project.":
+    "Sea voluntario del Proyecto “Prepare su propio” Shortcake de Fresa de St. Clement.",
+  "Pick your days, choose the jobs you like, and we'll take care of the rest. Simple for young and old.":
+    "Elija sus días, escoja los trabajos que le gusten y nosotros nos encargamos del resto. Fácil para jóvenes y mayores.",
+  "Start Volunteer Sign-Up": "Comenzar inscripción",
+  "See Job Descriptions": "Ver descripciones de trabajos",
+  "First time volunteering?": "¿Primera vez como voluntario?",
+  "Come to Volunteer Orientation: Sunday, January 31, 2027 · St. Clement Cronin Hall · 5:00–7:00 PM.":
+    "Venga a la orientación de voluntarios: domingo 31 de enero de 2027 · Salón Cronin de St. Clement · 5:00–7:00 PM.",
+  "Booth Rules": "Reglas del puesto",
+  "Hall Rules": "Reglas del salón",
+  "Job Descriptions": "Descripciones de trabajos",
+  "Booth Positions": "Posiciones del puesto",
+  "Hall Positions": "Posiciones del salón",
+  "March 4–14 — sign up online below": "4–14 de marzo — inscríbase en línea abajo",
+  "March 3–14 · lunch provided · sign up by phone": "3–14 de marzo · almuerzo incluido · inscripción por teléfono",
+  "Every position, straight from the job sheet — so you know exactly what you're signing up for.":
+    "Cada posición, tal como aparece en la hoja de trabajos — para que sepa exactamente a qué se inscribe.",
+  "To sign up, call": "Para inscribirse, llame a",
+  "Tap for contact info": "Toque para ver el contacto",
+  "Tap for details": "Toque para más detalles",
+  "URGENTLY NEEDED": "SE NECESITA URGENTE",
+  Close: "Cerrar",
+  Age: "Edad",
+  Lifts: "Levanta",
+  "Ask at the hall — no phone sign-up needed.": "Pregunte en el salón — no se necesita inscripción por teléfono.",
+
+  // Wizard 2027
+  "Five easy steps. Simple for young and old.": "Cinco pasos fáciles. Sencillo para jóvenes y mayores.",
+  "1. About You": "1. Sobre usted",
+  "2. Your Days": "2. Sus días",
+  "3. Your Jobs": "3. Sus trabajos",
+  "4. Health & Safety": "4. Salud y seguridad",
+  "5. Review & Sign Up": "5. Revisar e inscribirse",
+  "1) About You": "1) Sobre usted",
+  "2) Your Days": "2) Sus días",
+  "3) Your Jobs": "3) Sus trabajos",
+  "4) Health & Safety": "4) Salud y seguridad",
+  "5) Review & Sign Up": "5) Revisar e inscribirse",
+  "First Name": "Nombre",
+  "Cell Phone": "Teléfono celular",
+  "Home Address": "Dirección",
+  "Emergency Contact Name": "Nombre del contacto de emergencia",
+  "Both English & Spanish": "Inglés y español",
+  "How many years have you volunteered with us before?": "¿Cuántos años ha sido voluntario con nosotros?",
+  "Returning volunteers get scheduled first — thank you for coming back!":
+    "Los voluntarios que regresan se programan primero — ¡gracias por volver!",
+  "Is this your first time volunteering with us?": "¿Es su primera vez como voluntario con nosotros?",
+  "Welcome! Orientation is for you.": "¡Bienvenido! La orientación es para usted.",
+  "Sunday, January 31, 2027 · St. Clement Cronin Hall · 5:00–7:00 PM.":
+    "Domingo 31 de enero de 2027 · Salón Cronin de St. Clement · 5:00–7:00 PM.",
+  "I will attend": "Asistiré",
+  "I can't attend": "No puedo asistir",
+  "I have a parent or guardian's OK to volunteer.": "Tengo el permiso de mi padre, madre o tutor para ser voluntario.",
+  "(For volunteers age 16–17.)": "(Para voluntarios de 16–17 años.)",
+  "The festival runs March 4–14, 2027, plus pack-up on the morning of March 15. Tap every shift you could work — picking a day doesn't lock you in, it just tells us when you're free.":
+    "El festival es del 4 al 14 de marzo de 2027, más la recogida la mañana del 15 de marzo. Toque cada turno en el que podría ayudar — elegir un día no lo compromete, solo nos dice cuándo está libre.",
+  "Early Setup (6 AM)": "Montaje temprano (6 AM)",
+  "Day (9:30–5:30)": "Día (9:30–5:30)",
+  "Night (5–11)": "Noche (5–11)",
+  "Pack-Up Morning": "Mañana de recogida",
+  "Add me to the emergency call list.": "Agrégueme a la lista de llamadas de emergencia.",
+  "If someone can't make it, we may call you last-minute on the days you choose.":
+    "Si alguien falta, podríamos llamarle a última hora en los días que elija.",
+  "Pick up to three booth jobs in the order you'd like them — 1st, 2nd, and 3rd choice. Tap a job to read what it involves before you add it.":
+    "Elija hasta tres trabajos del puesto en su orden de preferencia — 1.ª, 2.ª y 3.ª opción. Toque un trabajo para leer en qué consiste antes de agregarlo.",
+  "Booth Jobs": "Trabajos del puesto",
+  "Hall Jobs (call to sign up)": "Trabajos del salón (llame para inscribirse)",
+  "Hall jobs (March 3–14, lunch provided) are organized by phone — tap a job to see who to call. There's nothing to select here.":
+    "Los trabajos del salón (3–14 de marzo, almuerzo incluido) se organizan por teléfono — toque un trabajo para ver a quién llamar. Aquí no hay nada que seleccionar.",
+  "Pick this job": "Elegir este trabajo",
+  "Choice": "Opción",
+  "tap to remove": "toque para quitar",
+  "Your choices (in order)": "Sus opciones (en orden)",
+  "No jobs picked yet.": "Aún no ha elegido trabajos.",
+  "Happy to help anywhere?": "¿Dispuesto a ayudar donde sea?",
+  "Put me anywhere — Day shifts": "Pónganme donde sea — turnos de día",
+  "Put me anywhere — Night shifts": "Pónganme donde sea — turnos de noche",
+  "Before you pick this job, please know:": "Antes de elegir este trabajo, tenga en cuenta:",
+  "Minimum age:": "Edad mínima:",
+  "Lifting up to": "Levantar hasta",
+  "This position is for female volunteers": "Esta posición es para voluntarias",
+  "This position is for male volunteers": "Esta posición es para voluntarios varones",
+  "Training required before scheduling": "Requiere capacitación antes de programar",
+  "Handles cash": "Maneja efectivo",
+  "Outdoors in the sun": "Al aire libre, bajo el sol",
+  "Go Back": "Volver",
+  "Add as choice": "Agregar como opción",
+  "These answers help us place you in a job that fits. There are no wrong answers.":
+    "Estas respuestas nos ayudan a ubicarle en un trabajo adecuado. No hay respuestas incorrectas.",
+  "Can you stand and walk for most of a shift?": "¿Puede estar de pie y caminar la mayor parte del turno?",
+  "No / I'd rather not": "No / Prefiero que no",
+  "How much can you comfortably lift?": "¿Cuánto puede levantar cómodamente?",
+  "Light things only": "Solo cosas ligeras",
+  "Up to 25 lbs": "Hasta 25 libras",
+  "Up to 50 lbs": "Hasta 50 libras",
+  "I'm comfortable handling cash (for Cashier / Coffee jobs)":
+    "Me siento cómodo manejando efectivo (para Cajero / Café)",
+  "I'm OK working outdoors in the sun (for Crowd Control)":
+    "Puedo trabajar al aire libre bajo el sol (para Control de filas)",
+  "These last two are required for everyone:": "Estas dos últimas son obligatorias para todos:",
+  "I accept the volunteer participation responsibility statement":
+    "Acepto la declaración de responsabilidad de participación voluntaria",
+  "I agree to follow the food handling and safety rules":
+    "Acepto seguir las reglas de manejo y seguridad de alimentos",
+  "One quick look before you finish.": "Un vistazo rápido antes de terminar.",
+  "Job choices:": "Opciones de trabajo:",
+  "Emergency call list:": "Lista de llamadas de emergencia:",
+  "any day": "cualquier día",
+  "Put me anywhere:": "Pónganme donde sea:",
+  Day: "Día",
+  Night: "Noche",
+  "Signing you up…": "Inscribiéndole…",
+  "Sign Me Up!": "¡Inscríbanme!",
+  "Your Volunteer ID:": "Su número de voluntario:",
+  "Keep this number — it's how we'll list you on schedules. A coordinator will confirm your shifts closer to the festival. Watch for a confirmation by text or email.":
+    "Guarde este número — así aparecerá en los horarios. Un coordinador confirmará sus turnos más cerca del festival. Espere una confirmación por texto o correo.",
+  "Please fill in every box in this step — that way we can reach you about your shifts.":
+    "Complete todos los campos de este paso — así podremos comunicarnos sobre sus turnos.",
+  "Please pick at least one day you can help.": "Elija al menos un día en el que pueda ayudar.",
+  "Please pick at least one job, or check a \"put me anywhere\" box.":
+    "Elija al menos un trabajo o marque una casilla de \"pónganme donde sea\".",
+  "Please check the two required boxes (responsibility and food safety) to continue.":
+    "Marque las dos casillas obligatorias (responsabilidad y seguridad de alimentos) para continuar.",
+  "Please check the two required boxes (responsibility and food safety) before signing up.":
+    "Marque las dos casillas obligatorias (responsabilidad y seguridad de alimentos) antes de inscribirse.",
 };
