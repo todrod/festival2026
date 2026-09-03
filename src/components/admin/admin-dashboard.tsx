@@ -370,6 +370,9 @@ export function AdminDashboard() {
   const [detailVolunteerId, setDetailVolunteerId] = useState<string>("");
   const [shiftNoteText, setShiftNoteText] = useState("");
   const [commsPrefillShiftId, setCommsPrefillShiftId] = useState<string | undefined>(undefined);
+  const [replacementSuggestions, setReplacementSuggestions] = useState<
+    Record<string, Array<{ volunteerId: string; volunteerCode: string; name: string; reasons: string[] }>>
+  >({});
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/data", { cache: "no-store" });
@@ -630,6 +633,18 @@ export function AdminDashboard() {
     [data, shiftId],
   );
 
+  const demoActive = useMemo(
+    () => !!data?.volunteers.some((v) => v.email.endsWith("@festival.demo.local")),
+    [data],
+  );
+
+  // Slots that need a replacement: the volunteer cancelled via text or is a
+  // recorded no-show for this shift.
+  const needsReplacement = useMemo(
+    () => assigned.filter((a) => a.confirmationStatus === "CANCELLED" || a.noShow),
+    [assigned],
+  );
+
   const getVolunteerFit = useCallback(
     (volunteerId: string, roleIds?: string[]) => {
       const sourceRoles =
@@ -742,20 +757,54 @@ export function AdminDashboard() {
     await load();
   }
 
-  async function seedTestWorkers() {
-    setLoading(true);
-    const res = await fetch("/api/admin/test-workers", { method: "POST" });
+  async function loadReplacements(assignmentId: string, roleId: string) {
+    const res = await fetch("/api/admin/suggestions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shiftId, roleId, limit: 3 }),
+    });
+    const payload = await res.json().catch(() => ({ suggestions: [] }));
+    setReplacementSuggestions((prev) => ({ ...prev, [assignmentId]: payload.suggestions ?? [] }));
+    if (!payload.suggestions?.length) setMessage(t("No eligible replacements available for this position."));
+  }
+
+  // Swap: remove the cancelled/no-show assignment, place the suggested
+  // volunteer into the same position.
+  async function applyReplacement(assignmentId: string, roleId: string, volunteerId: string) {
+    await fetch(`/api/admin/assignments?id=${assignmentId}`, { method: "DELETE" });
+    const res = await fetch("/api/admin/assignments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volunteerId, shiftId, roleId }),
+    });
     const payload = await res.json().catch(() => ({}));
-    setMessage(res.ok ? `${t("Created")} ${payload.created ?? 0} ${t("test workers.")}` : payload.error || t("Failed to create test workers"));
+    setMessage(res.ok ? payload.warning || t("Replacement placed.") : payload.error || t("Replacement failed"));
+    setReplacementSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[assignmentId];
+      return next;
+    });
+    await load();
+  }
+
+  async function enterDemoMode() {
+    setLoading(true);
+    const res = await fetch("/api/admin/demo", { method: "POST" });
+    const payload = await res.json().catch(() => ({}));
+    setMessage(
+      res.ok
+        ? `${t("Demo Mode on:")} ${payload.created ?? 0} ${t("fake volunteers")} · ${payload.flags ?? 0} ${t("flags")} · ${payload.notes ?? 0} ${t("notes")} · ${payload.triggers ?? 0} ${t("replacement triggers")}`
+        : payload.error || t("Failed to load demo volunteers"),
+    );
     setLoading(false);
     await load();
   }
 
-  async function clearTestWorkers() {
+  async function exitDemoMode() {
     setLoading(true);
-    const res = await fetch("/api/admin/test-workers", { method: "DELETE" });
+    const res = await fetch("/api/admin/demo", { method: "DELETE" });
     const payload = await res.json().catch(() => ({}));
-    setMessage(res.ok ? `${t("Removed")} ${payload.deleted ?? 0} ${t("test workers.")}` : payload.error || t("Failed to remove test workers"));
+    setMessage(res.ok ? `${t("Demo Mode off — removed")} ${payload.deleted ?? 0} ${t("fake volunteers.")}` : payload.error || t("Failed to remove demo volunteers"));
     setLoading(false);
     await load();
   }
@@ -912,6 +961,23 @@ export function AdminDashboard() {
         if (!v) return null;
         return <VolunteerDetail volunteer={v} flags={flagsByVolunteer.get(v.id) ?? []} onClose={() => setDetailVolunteerId("")} />;
       })()}
+
+      {demoActive && (
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-dashed border-strawberry-500 bg-sunny-100 px-4 py-2">
+          <p className="text-sm font-black text-strawberry-700">
+            🎭 {t("DEMO MODE")} — {t("fake Disney volunteers are loaded (flags, notes, and replacement triggers included). Real sign-ups are unaffected.")}
+          </p>
+          {isAdmin && (
+            <button
+              disabled={loading}
+              onClick={() => void exitDemoMode()}
+              className="rounded-md border border-strawberry-500 bg-card px-3 py-1.5 text-xs font-black text-strawberry-700 disabled:opacity-60"
+            >
+              {t("Exit Demo Mode")}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -1190,22 +1256,25 @@ export function AdminDashboard() {
 
               {isAdmin && (
                 <div className="flex flex-col gap-1 rounded-lg border border-dashed border-strawberry-300 p-2 md:ml-auto">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">{t("Demo data")}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/60">🎭 {t("Demo Mode")}</span>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      disabled={loading}
-                      onClick={() => void seedTestWorkers()}
-                      className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
-                    >
-                      {t("Add Test Workers")}
-                    </button>
-                    <button
-                      disabled={loading}
-                      onClick={() => void clearTestWorkers()}
-                      className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
-                    >
-                      {t("Remove Test Workers")}
-                    </button>
+                    {demoActive ? (
+                      <button
+                        disabled={loading}
+                        onClick={() => void exitDemoMode()}
+                        className="rounded-md border border-rose-500 px-3 py-2 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                      >
+                        {t("Exit Demo Mode (remove fake volunteers)")}
+                      </button>
+                    ) : (
+                      <button
+                        disabled={loading}
+                        onClick={() => void enterDemoMode()}
+                        className="rounded-md border border-cyan-500 px-3 py-2 text-sm font-semibold text-cyan-700 disabled:opacity-60"
+                      >
+                        {t("Load Demo Volunteers (Disney cast)")}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1228,6 +1297,67 @@ export function AdminDashboard() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {needsReplacement.length > 0 && (
+            <div className="panel border-2 border-red-400 bg-red-50 p-3">
+              <p className="text-sm font-black text-red-800">
+                🚨 {t("Needs replacement")} ({needsReplacement.length}) — {t("these volunteers cancelled or no-showed for this shift:")}
+              </p>
+              <div className="mt-2 space-y-2">
+                {needsReplacement.map((a) => {
+                  const suggestions = replacementSuggestions[a.id];
+                  return (
+                    <div key={a.id} className="rounded-lg border border-red-200 bg-card p-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>
+                          <span className="font-mono text-xs font-black text-strawberry-700">
+                            {a.volunteer.volunteerCode ?? a.volunteerId.slice(-6)}
+                          </span>{" "}
+                          <span className="font-semibold">{a.volunteer.firstName} {a.volunteer.lastName}</span>
+                          {" — "}{t(a.role.name)} ·{" "}
+                          <span className="font-bold text-red-700">
+                            {a.confirmationStatus === "CANCELLED" ? t("cancelled via text") : t("no-show")}
+                          </span>
+                        </p>
+                        <span className="flex gap-1.5">
+                          <button
+                            onClick={() => void loadReplacements(a.id, a.roleId)}
+                            className="rounded-md border border-leaf-500 px-2 py-1 text-xs font-bold text-leaf-700"
+                          >
+                            {t("Suggest replacement")}
+                          </button>
+                          <button
+                            onClick={() => void removeAssignment(a.id)}
+                            className="rounded-md border border-red-300 px-2 py-1 text-xs font-bold text-red-700"
+                          >
+                            {t("Remove from slot")}
+                          </button>
+                        </span>
+                      </div>
+                      {suggestions && suggestions.length > 0 && (
+                        <div className="mt-2 grid gap-1.5 md:grid-cols-3">
+                          {suggestions.map((s) => (
+                            <button
+                              key={s.volunteerId}
+                              onClick={() => void applyReplacement(a.id, a.roleId, s.volunteerId)}
+                              className="rounded-md border border-leaf-300 bg-leaf-200/40 p-2 text-left text-xs hover:bg-leaf-200"
+                            >
+                              <p>
+                                <span className="font-mono font-black text-strawberry-700">{s.volunteerCode}</span>{" "}
+                                <span className="font-semibold">{s.name}</span>
+                              </p>
+                              <p className="mt-0.5 text-foreground/70">{s.reasons.join(" · ")}</p>
+                              <p className="mt-1 font-bold text-leaf-700">→ {t("Tap to place")}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

@@ -10,6 +10,10 @@ const schema = z.object({
   limit: z.number().int().min(1).max(10).optional(),
 });
 
+// Replacement suggestions for a position on a shift, in the same priority
+// order autofill uses: legacy score DESC, then sign-up timestamp ASC, with the
+// volunteer's ranked preference for the position as context. DO_NOT_SCHEDULE
+// volunteers are excluded.
 export async function POST(req: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -19,44 +23,69 @@ export async function POST(req: Request) {
 
     const [role, availability, existingAssignments] = await Promise.all([
       prisma.role.findUnique({ where: { id: roleId } }),
-      prisma.availability.findMany({ where: { shiftId }, include: { volunteer: { include: { preferences: true } } } }),
+      prisma.availability.findMany({
+        where: { shiftId },
+        include: {
+          volunteer: {
+            include: {
+              preferences: true,
+              notes: { where: { category: "DO_NOT_SCHEDULE" }, select: { id: true } },
+            },
+          },
+        },
+      }),
       prisma.assignment.findMany({ where: { shiftId }, select: { volunteerId: true } }),
     ]);
 
-    if (!role) return NextResponse.json({ error: "Role not found" }, { status: 404 });
+    if (!role) return NextResponse.json({ error: "Position not found" }, { status: 404 });
 
     const assignedSet = new Set(existingAssignments.map((a) => a.volunteerId));
-    const scored: Array<{ volunteerId: string; name: string; score: number; reasons: string[] }> = [];
+    const candidates: Array<{
+      volunteerId: string;
+      volunteerCode: string;
+      name: string;
+      legacy: number;
+      signedUpAt: Date;
+      reasons: string[];
+    }> = [];
 
     for (const row of availability) {
       const volunteer = row.volunteer;
       if (assignedSet.has(volunteer.id)) continue;
+      if (volunteer.notes.length > 0) continue; // DO_NOT_SCHEDULE
 
       const eligible = await checkAssignmentEligibility({ volunteerId: volunteer.id, shiftId, roleId });
       if (!eligible.ok) continue;
 
       const pref = volunteer.preferences.find((p) => p.roleId === roleId);
-      const rankScore = pref ? 100 - pref.rank * 10 : 0;
-      const seniority = volunteer.yearsExperience;
-      const stable = Number.parseInt(volunteer.id.slice(-3), 36) % 7;
-      const score = rankScore + seniority + stable / 10;
-
       const reasons = [
-        pref ? `Preference rank #${pref.rank}` : "No explicit preference",
-        `${seniority} years experience`,
+        pref ? `Choice #${pref.rank} for this position` : "No stated preference",
+        `Legacy score ${volunteer.yearsExperience}`,
+        ...(eligible.warnings ?? []),
       ];
-
-      scored.push({
+      candidates.push({
         volunteerId: volunteer.id,
+        volunteerCode: volunteer.volunteerCode ?? volunteer.id.slice(-6),
         name: `${volunteer.firstName} ${volunteer.lastName}`,
-        score,
+        legacy: volunteer.yearsExperience,
+        signedUpAt: volunteer.createdAt,
         reasons,
       });
     }
 
-    scored.sort((a, b) => b.score - a.score);
+    candidates.sort(
+      (a, b) => b.legacy - a.legacy || a.signedUpAt.getTime() - b.signedUpAt.getTime(),
+    );
 
-    return NextResponse.json({ ok: true, suggestions: scored.slice(0, limit) });
+    return NextResponse.json({
+      ok: true,
+      suggestions: candidates.slice(0, limit).map(({ volunteerId, volunteerCode, name, reasons }) => ({
+        volunteerId,
+        volunteerCode,
+        name,
+        reasons,
+      })),
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Suggestions failed" }, { status: 400 });

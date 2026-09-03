@@ -77,7 +77,22 @@ npm install
 npx prisma db push && npm run prisma:seed
 npm run dev
 ```
-Admin → Scheduler tab → "Add Test Workers" seeds 79 demo volunteers.
+
+## Demo Mode
+Admin → Scheduler tab → **Load Demo Volunteers (Disney cast)** seeds 32 fake
+volunteers engineered so every flag and trigger fires: under-16 (Lilo, Peter),
+16–17 without consent (Moana) vs. with consent (Wendy), gender mismatch
+(Gaston prefers Berry Girl), lifting mismatch (Kristoff), standing mismatch
+(Mama Odie), DO_NOT_SCHEDULE despite high legacy (Scar), callout history with
+live cancelled-via-text slots (Hades, Ursula), a no-show (Capt. Hook), a
+Spanish-only volunteer (Miguel), supervisor gating (Woody approved, Buzz
+trained-only), and legacy-priority veterans (Mickey/Minnie, 15 years). Each has
+2–3 ranked position choices and full availability for their profile. A dashed
+**DEMO MODE** banner shows while they're loaded; **Exit Demo Mode** removes
+them completely (real sign-ups untouched — demo emails end in
+`@festival.demo.local`). Cancelled/no-show slots surface in the scheduler's
+**Needs replacement** panel with one-tap, legacy-ordered replacement
+suggestions.
 
 ## Deploy notes (2027 schema)
 `vercel-build` runs `prisma db push --accept-data-loss` + seed. The 2027 schema
